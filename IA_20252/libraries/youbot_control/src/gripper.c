@@ -32,23 +32,40 @@
 #define MAX_POS 0.025
 #define OFFSET_WHEN_LOCKED 0.021
 
-static WbDeviceTag fingers;
+static WbDeviceTag finger_left;
+static WbDeviceTag finger_right;
 
 void gripper_init() {
-  fingers = wb_robot_get_device("finger::left");
+  finger_left = wb_robot_get_device("finger::left");
+  finger_right = wb_robot_get_device("finger::right");
 
-  wb_motor_set_velocity(fingers, 0.03);
+  if (finger_left)
+    wb_motor_set_velocity(finger_left, 0.03);
+  if (finger_right)
+    wb_motor_set_velocity(finger_right, 0.03);
 }
 
 void gripper_grip() {
-  wb_motor_set_position(fingers, MIN_POS);
+  if (finger_left)
+    wb_motor_set_position(finger_left, MIN_POS);
+  if (finger_right)
+    wb_motor_set_position(finger_right, MIN_POS);
 }
 
 void gripper_release() {
-  wb_motor_set_position(fingers, MAX_POS);
+  if (finger_left)
+    wb_motor_set_position(finger_left, MAX_POS);
+  if (finger_right)
+    wb_motor_set_position(finger_right, MAX_POS);
 }
 
 void gripper_set_gap(double gap) {
   double v = bound(0.5 * (gap - OFFSET_WHEN_LOCKED), MIN_POS, MAX_POS);
-  wb_motor_set_position(fingers, v);
+  // Ensure the value is never negative due to floating point precision issues
+  if (v < 0.0) v = 0.0;
+  
+  if (finger_left)
+    wb_motor_set_position(finger_left, v);
+  if (finger_right)
+    wb_motor_set_position(finger_right, v);
 }

@@ -1,216 +1,278 @@
-from controller import Robot
+from controller import Robot, Keyboard
 from base import Base
 from arm import Arm
 from gripper import Gripper
-import random as rand
-import math
-import os
+import numpy as np
+import cv2
+import joblib
+from pathlib import Path
 
-# ---- Tunable parameters ----
-SAFE_DISTANCE = 0.40     # meters: minimum allowed distance in front sector
-FRONT_SECTOR_RAYS = 40    # number of LIDAR rays on each side of front to check
-TURN_STEPS = 70          # controller steps to spend rotating in AVOID state
-FORWARD_STEPS = 130       # steps to keep chosen random direction
-MAX_LINEAR_SPEED = 0.5  # vx/vy magnitude limit passed to base.move (m/s)
-MAX_ANGULAR_SPEED = 0.4   # omega (rad/s) when rotating to avoid
-CAMERA_SAVE_INTERVAL = 10  # steps between saving front-camera images
-IMAGE_SAVE_QUALITY = 100
-MIN_OBSTACLE_DISTANCE = 0.45  # meters: ignore readings closer than this (wheels/robot body)
-SAVE_ALL_CAMERAS = True     
-MAX_IMAGES_PER_SESSION = 20000  
-# WE NEED TO DEFINE THE LABELS!
+
 class YouBotController:
     def __init__(self):
         self.robot = Robot()
         self.time_step = int(self.robot.getBasicTimeStep())
-        
+
+        # ================= ROBOT =================
         self.base = Base(self.robot)
         self.arm = Arm(self.robot)
         self.gripper = Gripper(self.robot)
 
-        # Cameras
+        # ================= KEYBOARD =================
+        self.keyboard = self.robot.getKeyboard()
+        self.keyboard.enable(self.time_step)
+
+        # ================= CAMERAS =================
+        self.gripper_camera = self.robot.getDevice("gripper_camera")
         self.front_camera = self.robot.getDevice("front camera")
-        self.front_camera.enable(self.time_step)
 
-        self.left_camera = self.robot.getDevice("left camera")
-        self.left_camera.enable(self.time_step)
-        
-        self.right_camera = self.robot.getDevice("right camera")
-        self.right_camera.enable(self.time_step)
+        if self.gripper_camera:
+            self.gripper_camera.enable(self.time_step)
+            print("Gripper camera enabled")
 
-        self.back_camera = self.robot.getDevice("back camera")
-        self.back_camera.enable(self.time_step)
-        
-        
-        
-        # bookkeeping for camera saves
-        self.step_count = 0
-        self.images_saved = 0
-        os.makedirs("training_data/front", exist_ok=True)
-        os.makedirs("training_data/left", exist_ok=True)
-        os.makedirs("training_data/right", exist_ok=True)
-        os.makedirs("training_data/back", exist_ok=True)
-        
-        # LIDAR
-        self.lidar = self.robot.getDevice("lidar")
-        self.lidar.enable(self.time_step)
-        self.lidar.enablePointCloud()
+        if self.front_camera:
+            self.front_camera.enable(self.time_step)
+            print("Front camera enabled")
 
-        # FSM state
-        self.state = "RANDOM_MOVE"   # RANDOM_MOVE, AVOID
-        self.state_timer = 0
+       
+        self.active_camera = self.gripper_camera
+        self.camera_mode = "gripper"
 
-        # movement command
-        self.vx = 0.0
-        self.vy = 0.0
-        self.omega = 0.0
-        
-        
-    def _save_training_data(self):
-            """Save comprehensive training data with labels"""
-            if self.images_saved >= MAX_IMAGES_PER_SESSION:
-                return
-                
-            timestamp = f"{self.step_count:06d}"
-            
-            # Save all camera views if enabled
-            cameras = {
-                "front": self.front_camera,
-                "left": self.left_camera, 
-                "right": self.right_camera,
-                "back": self.back_camera
-            }
-            
-            saved_any = False
-            for cam_name, camera in cameras.items():
-                image_data = camera.getImage()
-                if image_data:
-                    filename = f"training_data/{cam_name}/img_{timestamp}.png"
-                    if camera.saveImage(filename, IMAGE_SAVE_QUALITY):
-                        saved_any = True
-            
-            self.images_saved += 1
-        
-    def lidar_sectors(self, ranges):
-        n = len(ranges)
-        if n == 0:
-            return float('inf'), float('inf'), float('inf')
+        # ================= MOVEMENT =================
+        self.forward_speed = 0.3
+        self.strafe_speed = 0.3
+        self.movement_duration = 10
 
-        # YouBot LIDAR: index 0 = front, last index = also front
+        self.move_forward_counter = 0
+        self.move_backward_counter = 0
+        self.strafe_left_counter = 0
+        self.strafe_right_counter = 0
 
-        # Sector widths
-        SIDE = 50
-        CENTER = 30
+        # ================= HSV MLP =================
+        self.hsv_available = self.try_load_hsv_model()
 
-        left = ranges[:SIDE]
-        right = ranges[-SIDE:]
-        center_left = ranges[SIDE:SIDE + CENTER]
-        center_right = ranges[n - SIDE - CENTER:n - SIDE]
+        # ================= AUTO GRAB =================
+        self.auto_grab_mode = False
+        self.grab_sequence_step = 0
 
-        # combine center zone symmetrically
-        center = list(center_left) + list(center_right)
+    # ==========================================================
+    # LOAD MLP
+    # ==========================================================
+    def try_load_hsv_model(self):
+        model_path = Path(r"C:\Users\User\Documents\IA_PROJECT\Archives\files_webot\IA_20252\controllers\Model_Processing\hsv_mlp_model.pkl")
 
-        filter_valid = lambda arr: [d for d in arr if d > 0]
 
-        left_min = min(filter_valid(left)) if filter_valid(left) else float('inf')
-        center_min = min(filter_valid(center)) if filter_valid(center) else float('inf')
-        right_min = min(filter_valid(right)) if filter_valid(right) else float('inf')
+        if not model_path.exists():
+            print("❌ hsv_mlp_model.pkl not found")
+            return False
 
-        return left_min, center_min, right_min
+        data = joblib.load(model_path)
+        self.hsv_model = data["model"]
+        self.hsv_scaler = data["scaler"]
+        self.hsv_label_encoder = data["label_encoder"]
 
-    def _pick_random_direction(self, max_speed=MAX_LINEAR_SPEED):
-        """Return (vx, vy) random vector with magnitude in [0.1*max, max]"""
-        angle = rand.uniform(0, 2 * math.pi)
-        mag = rand.uniform(0.1 * max_speed, max_speed)
-        return mag * math.cos(angle), mag * math.sin(angle)
+        print("✅ HSV MLP model loaded")
+        return True
 
-    def _front_min_distance(self, ranges):
-        """Compute minimum distance in the front wedge from LIDAR ranges"""
-        # Webots LIDAR: index 0 ~ front, indices increase clockwise; use left and right slices
-        n = len(ranges)
-        if n == 0:
-            return float('inf')
-        left = ranges[:FRONT_SECTOR_RAYS]
-        right = ranges[-FRONT_SECTOR_RAYS:]
-        front = list(left) + list(right)
-        # filter out invalid non-positive readings
-        valid = [d for d in front if d is not None and d > 0.0]
-        return min(valid) if valid else float('inf')
+    # ==========================================================
+    # CAMERA SWITCH
+    # ==========================================================
+    def switch_camera(self):
+        cams = []
+        if self.gripper_camera:
+            cams.append(("gripper", self.gripper_camera))
+        if self.front_camera:
+            cams.append(("front", self.front_camera))
+        if self.detection_camera:
+            cams.append(("detection", self.detection_camera))
 
+        idx = [c[0] for c in cams].index(self.camera_mode)
+        self.camera_mode, self.active_camera = cams[(idx + 1) % len(cams)]
+        print(f"📷 Switched to {self.camera_mode} camera")
+
+    # ==========================================================
+    # POSITION FOR TEST
+    # ==========================================================
+    def position_for_gripper_camera_test(self):
+        self.active_camera = self.gripper_camera
+        self.camera_mode = "gripper"
+
+        self.arm.set_height(self.arm.RESET)
+        self.arm.set_orientation(self.arm.FRONT)
+        self.gripper.grip()
+
+        print("🎯 Ready for gripper HSV test")
+
+    # ==========================================================
+    # AUTO GRAB
+    # ==========================================================
+    def grab_cube_sequence(self):
+        if self.grab_sequence_step == 0:
+            self.arm.set_height(self.arm.FRONT_FLOOR)
+            self.arm.set_orientation(self.arm.FRONT)
+            self.grab_sequence_step = 1
+        elif self.grab_sequence_step == 1:
+            self.gripper.release()
+            self.grab_sequence_step = 2
+        elif self.grab_sequence_step == 2:
+            self.move_forward_counter = 15
+            self.grab_sequence_step = 3
+        elif self.grab_sequence_step == 3:
+            self.gripper.grip()
+            self.grab_sequence_step = 4
+        elif self.grab_sequence_step == 4:
+            self.arm.set_height(self.arm.FRONT_CARDBOARD_BOX)
+            self.auto_grab_mode = False
+            self.grab_sequence_step = 0
+
+    # ==========================================================
+    # HSV FEATURES (IGUAL AO TREINO)
+    # ==========================================================
+    def extract_hsv_features_from_bgr(self, bgr):
+        hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+
+        h = hsv[:, :, 0].astype(np.float32)
+        s = hsv[:, :, 1].astype(np.float32)
+        v = hsv[:, :, 2].astype(np.float32)
+
+        mask = (s > 60) & (v > 40)
+        if np.count_nonzero(mask) < 50:
+            return None
+
+        h, s, v = h[mask], s[mask], v[mask]
+
+        s_mean, s_std = np.mean(s) / 255, np.std(s) / 255
+        v_mean, v_std = np.mean(v) / 255, np.std(v) / 255
+
+        r = np.mean((h <= 8) | (h >= 172))
+        g = np.mean((h >= 40) & (h <= 80))
+        b = np.mean((h >= 100) & (h <= 130))
+
+        ratios = np.array([r, g, b])
+        ratios /= (np.sum(ratios) + 1e-6)
+
+        return np.array([*ratios, s_mean, s_std, v_mean, v_std], dtype=np.float32)
+
+    def capture_hsv_features(self):
+        img = self.active_camera.getImage()
+        if img is None:
+            return None
+
+        w, h = self.active_camera.getWidth(), self.active_camera.getHeight()
+        frame = np.frombuffer(img, np.uint8).reshape((h, w, 4))
+        return self.extract_hsv_features_from_bgr(frame[:, :, :3])
+
+    # ==========================================================
+    # MLP DECISION
+    # ==========================================================
+    def decide_color(self, features):
+        X = self.hsv_scaler.transform(features.reshape(1, -1))
+        pred = self.hsv_model.predict(X)[0]
+        return self.hsv_label_encoder.inverse_transform([pred])[0]
+
+    def test_hsv(self):
+        if not self.hsv_available:
+            print("❌ MLP unavailable")
+            return
+
+        feat = self.capture_hsv_features()
+        if feat is None:
+            print("❌ No valid HSV data")
+            return
+
+        color = self.decide_color(feat)
+        print(f"\n🤖 HSV + MLP → {color.upper()}")
+
+    # ==========================================================
+    # KEYBOARD (TODOS MANTIDOS)
+    # ==========================================================
+    def handle_keyboard_input(self):
+        key = self.keyboard.getKey()
+        while key >= 0:
+            if key in (ord('W'), ord('w')):
+                self.move_forward_counter = self.movement_duration
+            elif key in (ord('S'), ord('s')):
+                self.move_backward_counter = self.movement_duration
+            elif key in (ord('A'), ord('a')):
+                self.strafe_left_counter = self.movement_duration
+            elif key in (ord('D'), ord('d')):
+                self.strafe_right_counter = self.movement_duration
+
+            elif key in (ord('I'), ord('i')):
+                self.arm.increase_height()
+            elif key in (ord('K'), ord('k')):
+                self.arm.decrease_height()
+            elif key in (ord('J'), ord('j')):
+                self.arm.increase_orientation()
+            elif key in (ord('L'), ord('l')):
+                self.arm.decrease_orientation()
+
+            elif key in (ord('O'), ord('o')):
+                self.gripper.release()
+            elif key in (ord('P'), ord('p')):
+                self.gripper.grip()
+            elif key in (ord('G'), ord('g')):
+                self.auto_grab_mode = True
+                self.grab_sequence_step = 0
+            elif key in (ord('R'), ord('r')):
+                self.arm.set_height(self.arm.RESET)
+                self.arm.set_orientation(self.arm.FRONT)
+                self.gripper.release()
+
+            elif key in (ord('V'), ord('v')):
+                self.switch_camera()
+            elif key in (ord('T'), ord('t')):
+                self.position_for_gripper_camera_test()
+            elif key in (ord('H'), ord('h')):
+                self.test_hsv()
+
+            elif key in (ord('Q'), ord('q')):
+                return False
+
+            key = self.keyboard.getKey()
+        return True
+
+    # ==========================================================
+    # MOVEMENT LOOP
+    # ==========================================================
+    def update_movement(self):
+        vx = vy = 0.0
+
+        if self.move_forward_counter > 0:
+            vx = self.forward_speed
+            self.move_forward_counter -= 1
+        elif self.move_backward_counter > 0:
+            vx = -self.forward_speed
+            self.move_backward_counter -= 1
+
+        if self.strafe_left_counter > 0:
+            vy = self.strafe_speed
+            self.strafe_left_counter -= 1
+        elif self.strafe_right_counter > 0:
+            vy = -self.strafe_speed
+            self.strafe_right_counter -= 1
+
+        self.base.move(vx, vy, 0)
+
+    def update_auto_grab(self):
+        if self.auto_grab_mode:
+            self.grab_cube_sequence()
+
+    # ==========================================================
+    # MAIN LOOP
+    # ==========================================================
     def run(self):
-        # initial random direction
-        self.vx, self.vy = self._pick_random_direction()
-        self.state_timer = FORWARD_STEPS
+        print("🎯 HSV + MLP READY — ALL KEYS ACTIVE")
 
         while self.robot.step(self.time_step) != -1:
-            self.step_count += 1
+            if not self.handle_keyboard_input():
+                break
+            self.update_movement()
+            self.update_auto_grab()
 
-           
-            raw_ranges = self.lidar.getRangeImage()
-            # Filter out wheel detections
-            ranges = [r if r > MIN_OBSTACLE_DISTANCE else float('inf') for r in raw_ranges]
-            
-            # Debug: show actual obstacle detections (not wheels)
-            obstacle_ranges = [i for i in ranges if i != float('inf')]
-            print(f"Real obstacles detected: {len(obstacle_ranges)} readings")
-            if obstacle_ranges:
-                print(f"Closest obstacle: {min(obstacle_ranges):.2f}m")
-
-            #wheels_range = [i for i in ranges if i!=float('inf')] #approx 0.4m
-            dmin_front = self._front_min_distance(ranges)
-
-            # Save front-camera image periodically
-            if self.step_count % CAMERA_SAVE_INTERVAL == 0:
-                image_data = self.front_camera.getImage()
-                if image_data:
-                    filename = f"camera_outputs/front_{self.step_count}.png"
-                    # saveImage returns True/False depending on success
-                    self.front_camera.saveImage(filename, IMAGE_SAVE_QUALITY)
-
-            left_d, center_d, right_d = self.lidar_sectors(ranges)
-
-        # Decide navigation
-            if self.state == "RANDOM_MOVE":
-
-                # If the CENTER is blocked → avoid
-                if center_d < SAFE_DISTANCE:
-                    self.state = "AVOID"
-                    self.state_timer = TURN_STEPS
-
-                    # Choose turn direction based on which side is more free
-                    if left_d > right_d:
-                        # turn left
-                        self.omega = MAX_ANGULAR_SPEED
-                    else:
-                        # turn right
-                        self.omega = -MAX_ANGULAR_SPEED
-
-                    self.base.move(0.0, 0.0, self.omega)
-                    continue
-
-                # If only side sectors see boxes → go straight → pass between them
-                if self.state_timer <= 0:
-                    self.vx, self.vy = self._pick_random_direction()
-                    self.state_timer = FORWARD_STEPS
-
-                self.base.move(self.vx, self.vy, 0.0)
-                self.state_timer -= 1
-
-            elif self.state == "AVOID":
-                self.base.move(0, 0, self.omega)
-                self.state_timer -= 1
-
-                if self.state_timer <= 0:
-                    self.vx, self.vy = self._pick_random_direction()
-                    self.state = "RANDOM_MOVE"
-                    self.state_timer = FORWARD_STEPS
-                    self.base.move(self.vx, self.vy, 0)
+        self.base.move(0, 0, 0)
+        print("Stopped")
 
 
-            # Loop end: continue stepping
-            # Save training data
-            if self.step_count % CAMERA_SAVE_INTERVAL == 0:
-                self._save_training_data()
 if __name__ == "__main__":
-    controller = YouBotController()
-    controller.run()
+    YouBotController().run()

@@ -156,14 +156,12 @@ for i in range(n_objects):
     """
     root_children.importMFNodeFromString(-1, node_string)
     spawned_count += 1
-
 print(f"Spawn complete. The supervisor has spawned {spawned_count}/{n_objects} objects ({failed_spawns} failed).")
-#print("Initializing physics...")
 
+# Deixe a física estabilizar
 for _ in range(20):
     supervisor.step(timestep)
 
-#print("Supervisor ready.")
-
-#while supervisor.step(timestep) != -1:
-    #pass
+# Mantém supervisor vivo para garantir física correta
+while supervisor.step(timestep) != -1:
+    pass
