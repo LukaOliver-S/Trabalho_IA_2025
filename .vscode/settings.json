@@ -1,0 +1,5 @@
+{
+    "python.analysis.extraPaths": [
+        "./IA_20252/controllers/youbot"
+    ]
+}

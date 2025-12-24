@@ -7,11 +7,10 @@ centralWidgetVisible: 1
 renderingMode: PLAIN
 orthographicViewHeight: 1
 textFiles: -1
-globalOptionalRendering: LidarRaysPaths::LidarPointClouds::CameraFrustums::AllBoundingObjects
+globalOptionalRendering: LidarPointClouds::CameraFrustums::AllBoundingObjects::LidarRaysPaths::DistanceSensorRays
 consoles: Console:All:All
 renderingDevicePerspectives: Supervisor:CAM;0;1;0.272282;0.150943
 renderingDevicePerspectives: youBot:back camera;0;0.5;0;0
-renderingDevicePerspectives: youBot:front camera;1;0.486321;0.163784;0.0100736
-renderingDevicePerspectives: youBot:gripper_camera;1;0.271484;0;0
+renderingDevicePerspectives: youBot:front camera;1;0.486321;0.697574;0
 renderingDevicePerspectives: youBot:left camera;0;0.621094;0;0
 renderingDevicePerspectives: youBot:right camera;0;0.425781;0.173479;0.00314465
