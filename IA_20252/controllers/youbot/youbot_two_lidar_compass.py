@@ -5,23 +5,14 @@ from base import Base
 from arm import Arm
 from gripper import Gripper
 import numpy as np
-from pathlib import Path
-
 import sys
-from youbot_auxiliar.Sensors import SensorSuite
-from youbot_auxiliar.MovementController import MovementController
-from youbot_auxiliar.AngleController import AngleController
-from youbot_auxiliar.ObstacleAvoider import ObstacleAvoider
-from youbot_auxiliar.PickController import PickController
-from youbot_auxiliar.AlignmentController import AlignmentController
-from youbot_auxiliar.ObjectDetector import ObjectDetector
-from youbot_auxiliar.LidarGpsController import LidarGpsController
+
 class YouBotController:
     def __init__(self):
         self.robot = Robot()
         self.time_step = int(self.robot.getBasicTimeStep())
         self.dt = self.time_step / 1000.0
-        self.DEBUG = True
+
         # ================= COMPONENTES =================
         self.base = Base(self.robot)
         self.arm = Arm(self.robot)
@@ -34,95 +25,55 @@ class YouBotController:
         # ================= LiDARs =================
         self.lidar_low = self.robot.getDevice("lidar_horizontal")
         self.lidar_high = self.robot.getDevice("lidar_horizontal_2")
-        self.lidar_global = self.robot.getDevice("lidar")
-        if self.lidar_low is None or self.lidar_high is None or self.lidar_global is None:
+
+        if self.lidar_low is None or self.lidar_high is None:
             print("❌ ERRO: LiDARs não encontrados", file=sys.stderr)
             sys.exit(1)
 
         self.lidar_low.enable(self.time_step)
         self.lidar_high.enable(self.time_step)
-        self.lidar_global.enable(self.time_step)   
-        # ================= LIDAR_GPS ===============
 
-        self.lidar_gps = LidarGpsController(
-            self.lidar_global,
-            model_path=Path(r"C:\Users\User\Documents\IA_PROJECT\Archives\files_webot\IA_20252\controllers\model_processing_lidar\lidar_pose_cnn_temporal_1_kaggle.pth"),
-            T=3,
-            max_range=5.5,
-            debug=self.DEBUG
-        )
         # ================= COMPASS =================
         self.compass = self.robot.getDevice("compass")
         self.compass.enable(self.time_step)
-        # ==================SENSORS====================
-        self.sensors = SensorSuite(self.lidar_low, self.lidar_high, self.compass, step_wait=self._step_wait)
         # ================= MOVIMENTO =================
-        self.movement = MovementController(self.base, step_wait=self._step_wait)
         self.forward_speed = 0.3
         self.strafe_speed = 0.3
         self.movement_duration = 10
+
         self.move_forward_counter = 0
         self.move_backward_counter = 0
         self.strafe_left_counter = 0
         self.strafe_right_counter = 0
-        # ================= angulação =================
-        self.angle_controller = AngleController(self.compass, self.base, self.dt) # Por algum motivo não funciona
-      
-  
-        
+
         # ================= PARÂMETROS =================
         self.CUBE_HEIGHT = 0.03
         self.DISTANCE_DIFF_THRESH = 0.01
+        self.DEBUG = True
+
         # ================= PICK =================
         self.PICK_DISTANCE = 0.104
-        self.PICK_TOL = 0.005
-        self.MIN_APPROACH_SPEED = 0.03  # velocidade mínima para aproximação
-        self.ALIGN_DEADZONE = 0.005     # tolerância lateral para considerar "centralizado"
-        #================== GRIPPER CONTROLLER ========
-        self.picker = PickController(self.arm, self.gripper, self.base, step_wait=self._step_wait, debug=self.DEBUG)
+        self.PICK_TOL = 0.003
+
         self.gripper_descended = False
-        self.is_picking = False   
+        self.is_picking = False   # <<< flag CRÍTICA
         self.initial_angle = 0.0
         self.rotating = False
         self.target_angle = None
-        #================= Align Controller ==========
-        self.aligner = AlignmentController(
-            self.base, self.sensors, step_wait=self._step_wait,
-            kp=1.5, max_vy=0.06, deadzone=self.ALIGN_DEADZONE,
-            forward_speed=self.forward_speed,
-            pick_distance=self.PICK_DISTANCE,
-            pick_tol=self.PICK_TOL,
-            min_approach_speed=self.MIN_APPROACH_SPEED,
-            debug=self.DEBUG
-        )
-   
-    # ================= AVOID ====================
-        self.OBSTACLE_MIN_DIST = 0.30   # espaço mínimo atrás do cubo para considerar "acessível"
-        self.obstacle_detected = False
-        self.obstacle_blocking_cube = False
-        self.avoiding = False
-        self.avoider = ObstacleAvoider(self.base, self.lidar_low, self.lidar_high, self.sensors, step_wait=self._step_wait, dt=self.dt, debug=self.DEBUG)
-
-     # ================== OBJECT DETECTOR==========
-        self.detector = ObjectDetector(self.sensors,
-                               distance_diff_thresh=self.DISTANCE_DIFF_THRESH,
-                               obstacle_min_dist=self.OBSTACLE_MIN_DIST,
-                               step_wait=self._step_wait,
-                               debug=self.DEBUG)
     # ================= KEYBOARD =================
     def handle_keyboard_input(self):
         key = self.keyboard.getKey()
         while key >= 0:
             if key in (ord('W'), ord('w')):
-                self.movement.forward()
+                self.move_forward_counter = self.movement_duration
             elif key in (ord('S'), ord('s')):
-                self.movement.backward()
+                self.move_backward_counter = self.movement_duration
             elif key in (ord('A'), ord('a')):
-                self.movement.strafe_left()
+                self.strafe_left_counter = self.movement_duration
             elif key in (ord('D'), ord('d')):
-                self.movement.strafe_right()
+                self.strafe_right_counter = self.movement_duration
             elif key == ord(' '):
-                self.movement.stop_all()
+                self.base.move(0, 0, 0)
             elif key in (ord('Q'), ord('q')):
                 return False
             elif key == ord('J'):  # Gira 90° à esquerda
@@ -136,15 +87,44 @@ class YouBotController:
 
     # ================= MOVIMENTO =================
     def update_movement(self):
-        # proxy picking/block state into movement controller and delegate
-        self.movement.is_picking = getattr(self, "picker", None) and self.picker.is_picking
-        self.movement.block_forward = getattr(self, "block_forward", False)
-        self.movement.update()
+        # 🚨 durante o pick o robô NÃO SE MOVE
+        if self.is_picking:
+            self.base.move(0, 0, 0)
+            return
+
+        vx = vy = omega = 0.0
+
+        if self.move_forward_counter > 0:
+            vx = self.forward_speed
+            self.move_forward_counter -= 1
+        elif self.move_backward_counter > 0:
+            vx = -self.forward_speed
+            self.move_backward_counter -= 1
+
+        if self.strafe_left_counter > 0:
+            vy = self.strafe_speed
+            self.strafe_left_counter -= 1
+        elif self.strafe_right_counter > 0:
+            vy = -self.strafe_speed
+            self.strafe_right_counter -= 1
+
+        self.base.move(vx, vy, omega)
 
     # ================= LIDAR READ =================
     def read_lidars(self):
-        return self.sensors.read_lidars()
+        low = np.array(self.lidar_low.getRangeImage())
+        high = np.array(self.lidar_high.getRangeImage())
+
+        low = low[np.isfinite(low) & (low > 0)]
+        high = high[np.isfinite(high) & (high > 0)]
+
+        min_low = np.min(low) if low.size else float('inf')
+        min_high = np.min(high) if high.size else float('inf')
+
+        return min_low, min_high
     # ================= COMPASS / ROTAÇÃO =================
+   
+
     def get_current_angle(self):
         north = self.compass.getValues()
         angle_rad = math.atan2(north[0], north[1])
@@ -197,7 +177,7 @@ class YouBotController:
         current_angle = self.get_current_angle()
         diff = self.angle_diff(self.target_angle, current_angle)
 
-        deadzone = 0.2
+        deadzone = 0.1
         max_speed = 1.0
         slow_zone = 15.0
 
@@ -231,42 +211,58 @@ class YouBotController:
 
     # ================= DETECT (INTACTA) =================
     def detect_objects(self):
-        # Reset flags (mantém comportamento anterior)
-        if not self.is_picking:
-            if self.gripper_descended:
-                if self.DEBUG: print("resetando gripper_descended")
-            self.gripper_descended = False
-            if hasattr(self, "picker"):
-                self.picker.gripper_descended = False
+        self.cube_detected_a_frente = False  # Reset a cada ciclo
 
-        self.cube_detected_a_frente = False
-        self.obstacle_detected = False
-        self.obstacle_blocking_cube = False
+        try:
+            low_ranges = np.array(self.lidar_low.getRangeImage(), dtype=np.float32)
+        except Exception:
+            low_ranges = np.array([], dtype=np.float32)
+        try:
+            high_ranges = np.array(self.lidar_high.getRangeImage(), dtype=np.float32)
+        except Exception:
+            high_ranges = np.array([], dtype=np.float32)
 
-        res = self.detector.detect()
-        if not res:
+        if low_ranges.size == 0:
+            if self.DEBUG:
+                print("Nenhuma leitura do lidar_horizontal (baixo)")
+            return
+        if high_ranges.size == 0:
+            if self.DEBUG:
+                print("Nenhuma leitura do lidar_horizontal_2 (alto)")
+            return
+        self.lidar_low.enablePointCloud()
+        self.lidar_high.enablePointCloud()
+        
+        valid_low = low_ranges[np.isfinite(low_ranges) & (low_ranges > 0)]
+        valid_high = high_ranges[np.isfinite(high_ranges) & (high_ranges > 0)]
+
+        min_low = np.min(valid_low) if valid_low.size > 0 else float('inf')
+        min_high = np.min(valid_high) if valid_high.size > 0 else float('inf')
+
+        if min_low == float('inf') and min_high == float('inf'):
+          #  if self.DEBUG:
+             #   print("· Nada detectado pelos LiDARs")
             return
 
-        self.cube_detected_a_frente = bool(res["cube_detected_a_frente"])
-        self.obstacle_detected = bool(res["obstacle_detected"])
-        self.obstacle_blocking_cube = bool(res["obstacle_blocking_cube"])
+        if min_low < float('inf') and min_high == float('inf'):
+            print(f"🟦 Cubinho detectado (apenas baixo) | baixo={min_low:.3f} m")
+            self.cube_detected_a_frente = True
+            return
 
-    # ================= AVOID OBJECT ================================
-    def avoid_obstacle(self):
-            self.move_forward_counter = 0
-            self.move_backward_counter = 0
-            self.block_forward = True
-            self.base.move(0, 0, 0)
-            self._step_wait(0.03)
-            freed = self.avoider.start_avoid()
-            if freed:
-                self.obstacle_detected = False
-            # copia estados úteis do avoider para o controlador (opcional)
-            self.avoid_cooldown = self.avoider.avoid_cooldown
-            self.avoid_attempts = self.avoider.avoid_attempts
-            self.last_avoid_side = self.avoider.last_avoid_side
-            self.recently_freed = self.avoider.recently_freed
-            self.block_forward = False
+        if min_low == float('inf') and min_high < float('inf'):
+            print(f"🟨 Objeto alto detectado (apenas alto) | alto={min_high:.3f} m")
+            return
+
+        diff = min_high - min_low
+        if diff > self.DISTANCE_DIFF_THRESH:
+            if min_low < min_high:
+                print(f"🔹 Cubo na frente de obstáculo | baixo={min_low:.3f} m, alto={min_high:.3f} m, Δ={diff:.3f} m")
+                self.cube_detected_a_frente = True
+            else:
+                print(f"⚠️ Inconsistência: alto mais próximo que baixo | baixo={min_low:.3f} m, alto={min_high:.3f} m, Δ={diff:.3f} m")
+        else:
+            print(f"🟥 Obstáculo grande detectado | baixo={min_low:.3f} m, alto={min_high:.3f} m, Δ={diff:.3f} m")
+
     # ================= DESCEND GRIPPER (REESCRITA) =================
     def descend_gripper_if_target_distance(self):
         if self.is_picking or not self.cube_detected_a_frente:
@@ -279,16 +275,70 @@ class YouBotController:
             return
 
         if abs(min_low - self.PICK_DISTANCE) <= self.PICK_TOL:
-            self.is_picking = True
-            try:
-                self.picker.do_pick_blocking()
+            if not self.gripper_descended:
+                print("⬇️ Cubo a 0.104 m → descendo garra")
+                self.is_picking = True
+
+                # Para tudo
+                self.move_forward_counter = 0
+                self.move_backward_counter = 0
+                self.strafe_left_counter = 0
+                self.strafe_right_counter = 0
+                self.base.move(0, 0, 0)
+
+                # 1. Abre a garra
+                print("Abrindo garra...")
+                self.gripper.release()
+                self._step_wait(1.0)  # Espera garantir abertura
+
+                # 2. Desce o braço até o cubo
+                print("Descendo braço...")
+                self.arm.set_orientation(Arm.FRONT)
+                self._step_wait(0.05)
+                self.arm.set_height(Arm.FRONT_FLOOR)
+                self._step_wait(3.5)
+                self.arm.motors[1].setPosition(-1.10)
+                self.arm.motors[2].setPosition(-1.70)
+                self.arm.motors[3].setPosition(-0.70)
+                self._step_wait(1.5)  # Espera garantir braço no chão
+
+                # 3. Fecha a garra
+                print("Fechando garra...")
+                self.gripper.grip()
+                self._step_wait(1.2)  # Espera garantir fechamento
+
+                # 4. Sobe o braço
+                print("Subindo braço...")
+                self.arm.motors[1].setPosition(-1.0)
+                self.arm.motors[2].setPosition(-1.5)
+                self.arm.motors[3].setPosition(-0.6)
+                self._step_wait(1.5)
+
+                print("Levando para trás (braço esticado para trás, base reta)...")
+                self.arm.motors[0].setPosition(0.0)      # base reta (NÃO gira)
+                self.arm.motors[1].setPosition(0.5)      # levanta o braço
+                self.arm.motors[2].setPosition(1.0)      # estica para trás
+                self.arm.motors[3].setPosition(0.9)     # joga o braço para trás
+                self.arm.motors[4].setPosition(-0.5)      # gripper para baixo
+                self._step_wait(6.0)
+
+                print("Liberando cubo atrás do robô...")
+                self.gripper.release()
+                self._step_wait(0.7)
+
+                print("Retornando braço e garra para posição inicial...")
+                self.arm.set_height(Arm.RESET)
+                self.arm.set_orientation(Arm.FRONT)
+                self._step_wait(3.0)
+                self.gripper.release()
+                self._step_wait(0.5)
+
+                print("Pegada finalizada.")
                 self.gripper_descended = True
-            finally:
                 self.is_picking = False
         else:
             self.gripper_descended = False
-            
-   
+
     # ================= UTILS =================
     def _step_wait(self, seconds):
         steps = max(1, int(seconds / self.dt))
@@ -298,39 +348,21 @@ class YouBotController:
 
     # ================= LOOP =================
     def run(self):
-        print("=== YouBot | Garra desce a 0.104 m | Com alinhamento lateral automático ===")
-        self.robot.step(self.time_step)
-        self.lidar_gps.init_after_first_step()
-        
+        print("=== YouBot | Garra desce a 0.104 m | Sem avanço automático ===")
+
         while self.robot.step(self.time_step) != -1:
-            # inside main loop
-            pose = self.lidar_gps.step()
-            
-            if pose is not None:
-                self.lidar_pose = pose
-                if self.DEBUG:
-                    print(f"📍 LidarGPS pose: x={pose[0]:.3f}, y={pose[1]:.3f}")
             if not self.handle_keyboard_input():
                 break
+           # current_angle = self.get_current_angle()
+            #print(f"current_angle: {current_angle}")
+            self.update_movement()
             self.detect_objects()
-            # Prioriza pegar se houver cubo acessível e NÃO estiver bloqueado
-            if self.cube_detected_a_frente and not self.gripper_descended:
-                aligned = self.aligner.align_with_cube()
-                if aligned:
-                    reached = self.aligner.auto_approach_cube()
-                    if reached:
-                        self.descend_gripper_if_target_distance()
-            # Senão, se houver obstáculo detectado, trata de evitar
-            elif self.obstacle_detected:
-             
-                self.avoid_obstacle()
-            else:
-              
-                self.update_movement()
+            self.descend_gripper_if_target_distance()
             self.update_rotation()
 
         self.base.move(0, 0, 0)
         print("🛑 Controller finalizado")
+
 
 if __name__ == "__main__":
     YouBotController().run()

@@ -50,7 +50,7 @@ def get_existing_obstacles():
                     'y': pos[1],
                     'radius': radius + 0.1
                 })
-                #print(f"Found obstacle at ({pos[0]:.2f}, {pos[1]:.2f}) with radius {radius:.2f}")
+                print(f"Found obstacle at ({pos[0]:.2f}, {pos[1]:.2f}) with radius {radius:.2f}")
     
     return obstacles
 
