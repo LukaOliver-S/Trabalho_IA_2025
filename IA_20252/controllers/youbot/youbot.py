@@ -8,14 +8,18 @@ import numpy as np
 from pathlib import Path
 
 import sys
-from youbot_auxiliar.Sensors import SensorSuite
-from youbot_auxiliar.MovementController import MovementController
-from youbot_auxiliar.AngleController import AngleController
-from youbot_auxiliar.ObstacleAvoider import ObstacleAvoider
-from youbot_auxiliar.PickController import PickController
-from youbot_auxiliar.AlignmentController import AlignmentController
-from youbot_auxiliar.ObjectDetector import ObjectDetector
-from youbot_auxiliar.LidarGpsController import LidarGpsController
+from services import (
+    BlockHandler,
+    SensorSuite,
+    MovementController,
+    AngleController,
+    ObstacleAvoider,
+    AlignmentController,
+    ObjectDetector,
+    LidarGpsController,
+    ColorClassifier,
+)
+
 class YouBotController:
     def __init__(self):
         self.robot = Robot()
@@ -26,6 +30,8 @@ class YouBotController:
         self.base = Base(self.robot)
         self.arm = Arm(self.robot)
         self.gripper = Gripper(self.robot)
+        self.camera = self.robot.getDevice("camera")
+        self.camera.enable(self.time_step)
 
         # ================= KEYBOARD =================
         self.keyboard = self.robot.getKeyboard()
@@ -46,8 +52,8 @@ class YouBotController:
 
         self.lidar_gps = LidarGpsController(
             self.lidar_global,
-            model_path=Path(r"C:\Users\User\Documents\IA_PROJECT\Archives\files_webot\IA_20252\controllers\model_processing_lidar\lidar_pose_cnn_temporal_1_kaggle.pth"),
-            T=3,
+            model_path=Path("./models/lidar_pose_cnn_temporal_2_KAGGLE.pth"),
+            T=5,
             max_range=5.5,
             debug=self.DEBUG
         )
@@ -58,8 +64,8 @@ class YouBotController:
         self.sensors = SensorSuite(self.lidar_low, self.lidar_high, self.compass, step_wait=self._step_wait)
         # ================= MOVIMENTO =================
         self.movement = MovementController(self.base, step_wait=self._step_wait)
-        self.forward_speed = 0.3
-        self.strafe_speed = 0.3
+        self.forward_speed = 0.15
+        self.strafe_speed = 0.15
         self.movement_duration = 10
         self.move_forward_counter = 0
         self.move_backward_counter = 0
@@ -67,19 +73,16 @@ class YouBotController:
         self.strafe_right_counter = 0
         # ================= angulação =================
         self.angle_controller = AngleController(self.compass, self.base, self.dt) # Por algum motivo não funciona
-      
-  
         
         # ================= PARÂMETROS =================
         self.CUBE_HEIGHT = 0.03
         self.DISTANCE_DIFF_THRESH = 0.01
         # ================= PICK =================
-        self.PICK_DISTANCE = 0.104
+        self.PICK_DISTANCE = 0.170
         self.PICK_TOL = 0.005
         self.MIN_APPROACH_SPEED = 0.03  # velocidade mínima para aproximação
         self.ALIGN_DEADZONE = 0.005     # tolerância lateral para considerar "centralizado"
         #================== GRIPPER CONTROLLER ========
-        self.picker = PickController(self.arm, self.gripper, self.base, step_wait=self._step_wait, debug=self.DEBUG)
         self.gripper_descended = False
         self.is_picking = False   
         self.initial_angle = 0.0
@@ -109,6 +112,11 @@ class YouBotController:
                                obstacle_min_dist=self.OBSTACLE_MIN_DIST,
                                step_wait=self._step_wait,
                                debug=self.DEBUG)
+    
+        # ================= BLOCK HANDLER & COLOR CLASSIFIER ==========
+        self.block_handler = BlockHandler(self)
+        self.color_classifier = ColorClassifier(self, "./models/mlp_ab_model.joblib")
+        
     # ================= KEYBOARD =================
     def handle_keyboard_input(self):
         key = self.keyboard.getKey()
@@ -134,6 +142,10 @@ class YouBotController:
             key = self.keyboard.getKey()
         return True
 
+    def wait(self, steps=30):
+        for _ in range(steps):
+            self.robot.step(self.time_step)
+            
     # ================= MOVIMENTO =================
     def update_movement(self):
         # proxy picking/block state into movement controller and delegate
@@ -267,6 +279,7 @@ class YouBotController:
             self.last_avoid_side = self.avoider.last_avoid_side
             self.recently_freed = self.avoider.recently_freed
             self.block_forward = False
+            
     # ================= DESCEND GRIPPER (REESCRITA) =================
     def descend_gripper_if_target_distance(self):
         if self.is_picking or not self.cube_detected_a_frente:
@@ -314,12 +327,14 @@ class YouBotController:
                 break
             self.detect_objects()
             # Prioriza pegar se houver cubo acessível e NÃO estiver bloqueado
-            if self.cube_detected_a_frente and not self.gripper_descended:
+            if self.cube_detected_a_frente:
                 aligned = self.aligner.align_with_cube()
                 if aligned:
                     reached = self.aligner.auto_approach_cube()
                     if reached:
-                        self.descend_gripper_if_target_distance()
+                        label = self.color_classifier.capture_and_classify()
+                        self.block_handler.pick(label) 
+                        
             # Senão, se houver obstáculo detectado, trata de evitar
             elif self.obstacle_detected:
              

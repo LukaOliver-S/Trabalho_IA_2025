@@ -19,6 +19,24 @@ Description: Python wrapper for YouBot arm control
 from controller import Robot
 import math
 
+POSES = {
+    1: [0.385, 0.85, 0.5443,  1.78, 0.0],
+    2: [0.0, 0.85, 0.5443,  1.78, 0.0],
+    3: [-0.385, 0.85, 0.5443,  1.78, 0.0],
+    4: [0.450, 0.79, 0.679,  1.419, 0.0],
+    5: [0.150, 0.79, 0.679,  1.419, 0.0],
+    6: [-0.150, 0.79, 0.679,  1.419, 0.0],
+    7: [-0.450, 0.79, 0.679,  1.419, 0.0],
+    8: [0.390, 0.94, 0.4693,  1.284, 0.0],
+    9: [0.130, 0.94, 0.4693,  1.284, 0.0],
+    10: [-0.130, 0.94, 0.4693,  1.284, 0.0],
+    11: [-0.390, 0.94, 0.4693,  1.284, 0.0],
+    12: [0.365, 1.230, 0.019, 1.284, 0.0],
+    13: [0.1216, 1.230, 0.019, 1.284, 0.0],
+    14: [-0.1216, 1.230, 0.019, 1.284, 0.0],
+    15: [-0.365, 1.230, 0.019, 1.284, 0.0]
+}
+    
 class ArmHeight:
     """Enum-like class for arm height presets"""
     FRONT_FLOOR = 0
@@ -29,6 +47,7 @@ class ArmHeight:
     BACK_PLATE_LOW = 5
     HANOI_PREPARE = 6
     MAX_HEIGHT = 7
+    RESET2 = 8
 
 
 class ArmOrientation:
@@ -54,6 +73,7 @@ class Arm:
     BACK_PLATE_HIGH = ArmHeight.BACK_PLATE_HIGH
     BACK_PLATE_LOW = ArmHeight.BACK_PLATE_LOW
     HANOI_PREPARE = ArmHeight.HANOI_PREPARE
+    RESET2 = ArmHeight.RESET2
     
     BACK_LEFT = ArmOrientation.BACK_LEFT
     LEFT = ArmOrientation.LEFT
@@ -82,17 +102,30 @@ class Arm:
         ]
         
         # Set velocity for arm2 (special case from C code)
-        self.motors[1].setVelocity(0.5)
+        self.motors[1].setVelocity(0.3)
         
         self.current_height = ArmHeight.RESET
         self.current_orientation = ArmOrientation.FRONT
         
-        self.set_height(ArmHeight.RESET)
+        self.set_height(ArmHeight.RESET2)
         self.set_orientation(ArmOrientation.FRONT)
     
-    def reset(self):
+    def set_pose(self, pose_id, velocity=0.3):
+        if pose_id not in POSES:
+            print(f"Pose {pose_id} não existe")
+            return
+
+        # define velocidade (precisão)
+        for m in self.motors:
+            m.setVelocity(velocity)
+
+        angles = POSES[pose_id]
+        for i, angle in enumerate(angles):
+            self.motors[i].setPosition(angle)
+
+    def reset(self, reset_type=ArmHeight.RESET):
         """Reset arm to initial position"""
-        self.set_height(ArmHeight.RESET)
+        self.set_height(reset_type)
         self.set_orientation(ArmOrientation.FRONT)
     
     def set_height(self, height):
@@ -117,8 +150,14 @@ class Arm:
             self.motors[3].setPosition(-1.21)
             self.motors[4].setPosition(0.0)
         elif height == ArmHeight.RESET:
-            self.motors[1].setPosition(1.57)
             self.motors[2].setPosition(-2.635)
+            self.motors[1].setPosition(1.57)
+            self.motors[3].setPosition(1.78)
+            self.motors[4].setPosition(0.0)
+        elif height == ArmHeight.RESET2:
+            self.motors[2].setPosition(-2.635)
+            self.wait_time(3)
+            self.motors[1].setPosition(1.57)
             self.motors[3].setPosition(1.78)
             self.motors[4].setPosition(0.0)
         elif height == ArmHeight.BACK_PLATE_HIGH:
@@ -141,6 +180,12 @@ class Arm:
             return
         
         self.current_height = height
+
+    def wait_time(self, seconds):
+        steps = int((seconds * 1000) / self.time_step)
+        for _ in range(steps):
+            if self.robot.step(self.time_step) == -1:
+                break
     
     def set_orientation(self, orientation):
         """Set arm orientation (base rotation)

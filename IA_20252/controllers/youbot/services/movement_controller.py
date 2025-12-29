@@ -12,8 +12,8 @@ class MovementController:
         self.compass = compass  # store the device (Webots Compass)
 
         # translational parameters
-        self.forward_speed = 0.3
-        self.strafe_speed = 0.3
+        self.forward_speed = 0.1
+        self.strafe_speed = 0.1
         self.movement_duration = 10
 
         # counters (keyboard-driven)
