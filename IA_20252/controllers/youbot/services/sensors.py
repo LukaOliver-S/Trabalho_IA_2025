@@ -44,17 +44,40 @@ class SensorSuite:
             right = mv(right_mask, ranges_arr)
         return left, right
 
-    def get_cube_lateral_offset(self) -> float:
-        ranges = self.get_low_ranges()
-        if not np.isfinite(ranges).any():
-            return None
-        min_index = int(np.argmin(ranges))
-        num_points = len(ranges)
-        fov = self.lidar_low.getFov()
-        angle_per_index = fov / num_points
-        angle = (min_index - num_points // 2) * angle_per_index
-        min_distance = float(ranges[min_index])
-        return min_distance * math.sin(angle)
+    def get_cube_lateral_offset(self, cluster_delta: float = 0.05, max_angle_span: float = 0.4) -> float:
+            """
+            Estimate cube lateral offset (meters) by clustering near-min points and
+            returning the lateral coordinate of the cluster centroid. Returns None
+            if no valid measurements.
+            """
+            ranges = self.get_low_ranges()
+            if not np.isfinite(ranges).any():
+                return None
+
+            num_points = len(ranges)
+            min_index = int(np.nanargmin(np.where((np.isfinite(ranges) & (ranges > 0)), ranges, np.inf)))
+            min_dist = float(ranges[min_index])
+            fov = self.lidar_low.getFov()
+            angles = (np.arange(num_points) - num_points // 2) * (fov / num_points)
+
+            # candidate mask: valid, close enough to min, and within max_angle_span from center of cluster
+            close_mask = (np.isfinite(ranges) & (ranges > 0) & (ranges <= (min_dist + cluster_delta)))
+
+            # limit angular span around min_index to avoid other objects
+            angle_at_min = angles[min_index]
+            angular_span_mask = np.abs(angles - angle_at_min) <= max_angle_span
+
+            mask = close_mask & angular_span_mask
+            if mask.any():
+                d = ranges[mask].astype(np.float64)
+                ang = angles[mask]
+                xs = d * np.cos(ang)  # forward
+                ys = d * np.sin(ang)  # lateral
+                centroid_y = float(np.mean(ys))
+                return centroid_y
+
+    
+            return min_dist * math.sin(angle_at_min)
 
     def get_high_min_angle(self):
         ranges_high = self.get_high_ranges()
