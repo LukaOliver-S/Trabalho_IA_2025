@@ -1,15 +1,6 @@
-# controllers/youbot/youbot_auxiliar/ObjectDetector.py
 import numpy as np
 
 class ObjectDetector:
-    """
-    Dada uma SensorSuite, calcula:
-      - cube_detected_a_frente
-      - obstacle_detected
-      - obstacle_blocking_cube
-      - min_low, min_high
-    Mantém o último resultado em `last`.
-    """
     def __init__(self, sensors, distance_diff_thresh=0.01, obstacle_min_dist=0.30, step_wait=None, debug=False):
         self.sensors = sensors
         self.distance_diff_thresh = distance_diff_thresh
@@ -25,14 +16,16 @@ class ObjectDetector:
             "diff": float("inf"),
         }
 
+    def _dbg(self, msg):
+        if self.debug:
+            print(msg)
+
     def detect(self):
-        """Executa uma leitura e atualiza `last` com os flags e distâncias."""
+        """Read lidars and update `last` flags (keeps prior behavior)."""
         try:
             min_low, min_high = self.sensors.read_lidars()
         except Exception:
-            if self.debug:
-                print("Erro lendo LiDARs (ObjectDetector.detect)")
-            # devolve estado "vazio" (nenhum objeto detectado)
+            self._dbg("Erro lendo LiDARs (ObjectDetector.detect)")
             self.last.update({
                 "cube_detected_a_frente": False,
                 "obstacle_detected": False,
@@ -44,34 +37,29 @@ class ObjectDetector:
             return self.last
 
         diff = min_high - min_low
+        cube = obstacle = blocking = False
 
-        cube = False
-        obstacle = False
-        blocking = False
-
-        # Nada detectado
+        # none
         if min_low == float("inf") and min_high == float("inf"):
-            # nada a fazer
             pass
-        # Apenas chão detecta => cubo pequeno
+        # low only => small cube
         elif min_low < float("inf") and min_high == float("inf"):
-            if self.debug: print(f"🟦 Cubinho detectado (apenas baixo) | baixo={min_low:.3f} m")
+            self._dbg(f"Cubinho detectado (apenas baixo) | baixo={min_low:.3f} m")
             cube = True
-        # Apenas alto detecta => objeto alto (não interessa para pegar)
+        # high only => tall object
         elif min_low == float("inf") and min_high < float("inf"):
-            if self.debug: print(f"🟨 Objeto alto detectado (apenas alto) | alto={min_high:.3f} m")
+            self._dbg(f"Objeto alto detectado (apenas alto) | alto={min_high:.3f} m")
         else:
-            # Regras envolvendo diferença
             if diff >= self.distance_diff_thresh and min_low < min_high:
-                if self.debug: print(f"🔹 Cubo acessível | baixo={min_low:.3f} m alto={min_high:.3f} Δ={diff:.3f} m")
+                self._dbg(f"Cubo acessível | baixo={min_low:.3f} m alto={min_high:.3f} Δ={diff:.3f} m")
                 cube = True
             if min_low < self.obstacle_min_dist:
                 obstacle = True
                 if np.isfinite(min_high) and abs(diff) <= 0.02:
                     blocking = True
-                    if self.debug: print(f"🟥 Obstáculo muito perto (bloqueando) | baixo={min_low:.3f} alto={min_high:.3f} Δ={diff:.3f}")
+                    self._dbg(f"Obstáculo muito perto (bloqueando) | baixo={min_low:.3f} alto={min_high:.3f} Δ={diff:.3f}")
                 else:
-                    if self.debug: print(f"⚠️ Obstáculo próximo | baixo={min_low:.3f} m")
+                    self._dbg(f"Obstáculo próximo | baixo={min_low:.3f} m")
 
         self.last.update({
             "cube_detected_a_frente": cube,

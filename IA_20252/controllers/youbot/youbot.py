@@ -18,105 +18,139 @@ from services import (
     ObjectDetector,
     LidarGpsController,
     ColorClassifier,
+    FuzzySimple,
 )
+from dataclasses import dataclass
+
+@dataclass
+class YouBotConfig:
+    pick_distance: float = 0.170
+    pick_tolerance: float = 0.005
+    min_approach_speed: float = 0.03
+    align_deadzone: float = 0.005
+    obstacle_min_dist: float = 0.25
+    cube_height: float = 0.03
+    distance_diff_thresh: float = 0.01
+    min_approach_distance:float = 0.30
 
 class YouBotController:
     def __init__(self):
+        # core environment
         self.robot = Robot()
         self.time_step = int(self.robot.getBasicTimeStep())
         self.dt = self.time_step / 1000.0
-        self.DEBUG = True
-        # ================= COMPONENTES =================
-        self.base = Base(self.robot)
-        self.arm = Arm(self.robot)
-        self.gripper = Gripper(self.robot)
+        self.DEBUG = False
+
+        # central config and minimal runtime flags
+        self.config = YouBotConfig()
+        self.is_picking = False
+        self.gripper_descended = False
+        self.initial_angle = 0.0
+        self.rotating = False
+        self.target_angle = None
+
+        # grouped initialization
+        self._init_devices()
+        self._init_components()
+        self._init_controllers()
+
+    # --- compatibility properties (no duplicated state) ---
+    @property
+    def PICK_DISTANCE(self):
+        return self.config.pick_distance
+
+    @property
+    def PICK_TOL(self):
+        return self.config.pick_tolerance
+
+    @property
+    def MIN_APPROACH_SPEED(self):
+        return self.config.min_approach_speed
+
+    @property
+    def ALIGN_DEADZONE(self):
+        return self.config.align_deadzone
+
+    @property
+    def OBSTACLE_MIN_DIST(self):
+        return self.config.obstacle_min_dist
+
+    # --- helpers used in __init__ ---
+    def _init_devices(self):
+        # camera & keyboard
         self.camera = self.robot.getDevice("camera")
-        self.camera.enable(self.time_step)
-
-        # ================= KEYBOARD =================
+        if self.camera: self.camera.enable(self.time_step)
         self.keyboard = self.robot.getKeyboard()
-        self.keyboard.enable(self.time_step)
+        if self.keyboard: self.keyboard.enable(self.time_step)
 
-        # ================= LiDARs =================
+        # lidars & compass
         self.lidar_low = self.robot.getDevice("lidar_horizontal")
         self.lidar_high = self.robot.getDevice("lidar_horizontal_2")
         self.lidar_global = self.robot.getDevice("lidar")
-        if self.lidar_low is None or self.lidar_high is None or self.lidar_global is None:
-            print("❌ ERRO: LiDARs não encontrados", file=sys.stderr)
+        self.compass = self.robot.getDevice("compass")
+
+        missing = [n for n, d in (
+            ("lidar_horizontal", self.lidar_low),
+            ("lidar_horizontal_2", self.lidar_high),
+            ("lidar", self.lidar_global),
+            ("compass", self.compass),
+        ) if d is None]
+        if missing:
+            print(f"ERRO: dispositivos faltando: {', '.join(missing)}", file=sys.stderr)
             sys.exit(1)
 
+        # enable sensors
         self.lidar_low.enable(self.time_step)
         self.lidar_high.enable(self.time_step)
-        self.lidar_global.enable(self.time_step)   
-        # ================= LIDAR_GPS ===============
+        self.lidar_global.enable(self.time_step)
+        self.compass.enable(self.time_step)
 
+    def _init_components(self):
+        # hardware wrappers and logic components
+        self.fuzzy = FuzzySimple()
+
+        self.base = Base(self.robot)
+        self.arm = Arm(self.robot)
+        self.gripper = Gripper(self.robot)
+        
+        self.sensors = SensorSuite(self.lidar_low, self.lidar_high, self.compass, step_wait=self._step_wait)
+        self.movement = MovementController(
+            self.base,
+            step_wait=self._step_wait,
+            forward_speed=0.1,
+            strafe_speed=0.1,
+            movement_duration=10,
+            fuzzy=self.fuzzy,
+            front_dist_fn=self.sensors.read_low_filtered
+        )
         self.lidar_gps = LidarGpsController(
             self.lidar_global,
             model_path=Path("./models/lidar_pose_cnn_temporal_2_KAGGLE.pth"),
             T=5,
             max_range=5.5,
-            debug=self.DEBUG
+            debug=self.DEBUG,
         )
-        # ================= COMPASS =================
-        self.compass = self.robot.getDevice("compass")
-        self.compass.enable(self.time_step)
-        # ==================SENSORS====================
-        self.sensors = SensorSuite(self.lidar_low, self.lidar_high, self.compass, step_wait=self._step_wait)
-        # ================= MOVIMENTO =================
-        self.movement = MovementController(self.base, step_wait=self._step_wait)
-        self.forward_speed = 0.15
-        self.strafe_speed = 0.15
-        self.movement_duration = 10
-        self.move_forward_counter = 0
-        self.move_backward_counter = 0
-        self.strafe_left_counter = 0
-        self.strafe_right_counter = 0
-        # ================= angulação =================
-        self.angle_controller = AngleController(self.compass, self.base, self.dt) # Por algum motivo não funciona
-        
-        # ================= PARÂMETROS =================
-        self.CUBE_HEIGHT = 0.03
-        self.DISTANCE_DIFF_THRESH = 0.01
-        # ================= PICK =================
-        self.PICK_DISTANCE = 0.170
-        self.PICK_TOL = 0.005
-        self.MIN_APPROACH_SPEED = 0.03  # velocidade mínima para aproximação
-        self.ALIGN_DEADZONE = 0.005     # tolerância lateral para considerar "centralizado"
-        #================== GRIPPER CONTROLLER ========
-        self.gripper_descended = False
-        self.is_picking = False   
-        self.initial_angle = 0.0
-        self.rotating = False
-        self.target_angle = None
-        #================= Align Controller ==========
-        self.aligner = AlignmentController(
-            self.base, self.sensors, step_wait=self._step_wait,
-            kp=1.5, max_vy=0.06, deadzone=self.ALIGN_DEADZONE,
-            forward_speed=self.forward_speed,
-            pick_distance=self.PICK_DISTANCE,
-            pick_tol=self.PICK_TOL,
-            min_approach_speed=self.MIN_APPROACH_SPEED,
-            debug=self.DEBUG
-        )
-   
-    # ================= AVOID ====================
-        self.OBSTACLE_MIN_DIST = 0.30   # espaço mínimo atrás do cubo para considerar "acessível"
-        self.obstacle_detected = False
-        self.obstacle_blocking_cube = False
-        self.avoiding = False
-        self.avoider = ObstacleAvoider(self.base, self.lidar_low, self.lidar_high, self.sensors, step_wait=self._step_wait, dt=self.dt, debug=self.DEBUG)
 
-     # ================== OBJECT DETECTOR==========
+    def _init_controllers(self):
+
+        self.aligner = AlignmentController(
+            self.base, self.sensors,
+            kp=1.5, max_vy=0.06, deadzone=self.config.align_deadzone,
+            forward_speed=self.movement.forward_speed,
+            pick_distance=self.config.pick_distance,
+            pick_tol=self.config.pick_tolerance,
+            min_approach_speed=self.config.min_approach_speed,
+            debug=self.DEBUG,
+            
+        )
+        self.avoider = ObstacleAvoider(self.base, self.lidar_low, self.lidar_high, self.sensors, step_wait=self._step_wait, dt=self.dt, obstacle_min_dist=self.config.obstacle_min_dist, debug=self.DEBUG)
         self.detector = ObjectDetector(self.sensors,
-                               distance_diff_thresh=self.DISTANCE_DIFF_THRESH,
-                               obstacle_min_dist=self.OBSTACLE_MIN_DIST,
-                               step_wait=self._step_wait,
-                               debug=self.DEBUG)
-    
-        # ================= BLOCK HANDLER & COLOR CLASSIFIER ==========
+                                       distance_diff_thresh=self.config.distance_diff_thresh,
+                                       obstacle_min_dist=self.config.obstacle_min_dist,
+                                       step_wait=self._step_wait,
+                                       debug=self.DEBUG)
         self.block_handler = BlockHandler(self)
         self.color_classifier = ColorClassifier(self, "./models/mlp_ab_model.joblib")
-        
     # ================= KEYBOARD =================
     def handle_keyboard_input(self):
         key = self.keyboard.getKey()
@@ -273,11 +307,7 @@ class YouBotController:
             freed = self.avoider.start_avoid()
             if freed:
                 self.obstacle_detected = False
-            # copia estados úteis do avoider para o controlador (opcional)
-            self.avoid_cooldown = self.avoider.avoid_cooldown
-            self.avoid_attempts = self.avoider.avoid_attempts
-            self.last_avoid_side = self.avoider.last_avoid_side
-            self.recently_freed = self.avoider.recently_freed
+         
             self.block_forward = False
             
     # ================= DESCEND GRIPPER (REESCRITA) =================
@@ -322,12 +352,13 @@ class YouBotController:
             if pose is not None:
                 self.lidar_pose = pose
                 if self.DEBUG:
-                    print(f"📍 LidarGPS pose: x={pose[0]:.3f}, y={pose[1]:.3f}")
+                    print(f"LidarGPS pose: x={pose[0]:.3f}, y={pose[1]:.3f}")
             if not self.handle_keyboard_input():
                 break
             self.detect_objects()
             # Prioriza pegar se houver cubo acessível e NÃO estiver bloqueado
-            if self.cube_detected_a_frente:
+            dist = self.sensors.read_low_filtered()
+            if self.cube_detected_a_frente and  dist <= self.config.min_approach_distance:
                 aligned = self.aligner.align_with_cube()
                 if aligned:
                     reached = self.aligner.auto_approach_cube()
@@ -345,7 +376,7 @@ class YouBotController:
             self.update_rotation()
 
         self.base.move(0, 0, 0)
-        print("🛑 Controller finalizado")
+        print("Controller finalizado")
 
 if __name__ == "__main__":
     YouBotController().run()

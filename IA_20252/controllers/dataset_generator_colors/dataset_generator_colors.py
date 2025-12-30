@@ -4,7 +4,6 @@ import os, math
 
 TIME_STEP = 16
 
-# ✅ PARÂMETROS PARA SEMI-ESFERA COMPLETA (do chão até o topo) - APENAS CUBOS
 RADIUS_CUBES = 0.045        
 H_ANGLES_CUBES = 24        # 36 ângulos horizontais 
 V_ANGLES_CUBES = 24        # 12 inclinações: de 5° até 90° (quase horizontal até top-down)
@@ -15,7 +14,6 @@ WAIT_STEPS_BEFORE = 8
 WAIT_STEPS_BETWEEN = 1
 SAVE_QUALITY = 100
 
-# ✅ LIMITES DA ARENA
 ARENA_CENTER_X = -0.79
 ARENA_CENTER_Y = 0.0
 ARENA_WIDTH = 7.0   
@@ -25,7 +23,6 @@ for vi in range(V_ANGLES_CUBES):
     if V_ANGLES_CUBES == 1:
         theta = math.pi/4.0
     else:
-        # 🔥 EXPANDED VERTICAL RANGE - from very low to top-down
         theta_min = math.pi/18.0   # 10° (very low - almost ground level)
         theta_max = math.pi/1.8    # 100° (slightly past top-down for variety)
         theta = theta_min + (theta_max - theta_min) * vi / float(V_ANGLES_CUBES - 1)
@@ -87,7 +84,6 @@ def is_valid_camera_position(cx, cy, cz, object_z):
     y_min = ARENA_CENTER_Y - ARENA_HEIGHT/2 + 0.15 
     y_max = ARENA_CENTER_Y + ARENA_HEIGHT/2 - 0.15 
     
-    # ✅ CÂMERA PODE FICAR BEM BAIXA (quase no nível do objeto)
     z_min = max(0.01, object_z - 0.02)  # um pouquinho acima do objeto
     
     if cx < x_min or cx > x_max or cy < y_min or cy > y_max or cz < z_min:
@@ -95,7 +91,6 @@ def is_valid_camera_position(cx, cy, cz, object_z):
     
     return True
 
-# ✅ DETECÇÃO DE CUBOS - APENAS 3 CORES
 def detect_cubes(robot):
     cubes = []
     root = robot.getRoot()
@@ -158,19 +153,18 @@ def get_next_image_counter(base_dir):
     
     return max(existing_files) + 1 if existing_files else 0
 
-# ----- main -----
 def main():
     robot = Supervisor()
 
     cam_device = robot.getDevice("CAM")
     if cam_device is None:
-        print("[ERROR] Dispositivo Camera 'CAM' não encontrado.")
+        print(" Dispositivo Camera 'CAM' não encontrado.")
         return
     cam_device.enable(TIME_STEP)
 
     cam_node = robot.getSelf().getField("children").getMFNode(0)
     if cam_node is None:
-        print("[ERROR] Nó da câmera não encontrado.")
+        print(" Nó da câmera não encontrado.")
         return
     cam_trans = cam_node.getField("translation")
     cam_rot   = cam_node.getField("rotation")
@@ -182,16 +176,12 @@ def main():
 
     wait_steps(robot, WAIT_STEPS_BEFORE)
 
-    # ✅ DETECTAR APENAS CUBOS
     cubes = detect_cubes(robot)
     
-    print(f"[INFO] ✅ DATASET APENAS CUBOS COM 3 CORES: red, green, blue")
-    print(f"[INFO] ✅ SEMI-ESFERA COMPLETA (do chão até o topo)!")
-    print(f"[INFO] Cubos encontrados: {len(cubes)}")
+
     print(f"[INFO] Total de imagens: {len(cubes)} × {H_ANGLES_CUBES} × {V_ANGLES_CUBES} = {len(cubes) * H_ANGLES_CUBES * V_ANGLES_CUBES}")
     print(f"[INFO] Começando do contador: {img_counter}")
 
-    # ✅ PROCESSAR APENAS CUBOS (SEMI-ESFERA COMPLETA: do chão até o topo)
     for idx, (cube, color_name) in enumerate(cubes):
         print(f"[INFO] Processando cubo {idx+1}/{len(cubes)} ({color_name})")
         rot_field = cube.getField("rotation")
@@ -204,12 +194,10 @@ def main():
         target = (ox, oy, oz + HEIGHT_OFFSET)
         cube_images = 0
 
-        # ✅ SEMI-ESFERA COMPLETA: de 5° (quase horizontal) até 90° (top-down)
         for vi in range(V_ANGLES_CUBES):
             if V_ANGLES_CUBES == 1:
                 theta = math.pi/4.0
             else:
-                # ✅ RANGE COMPLETO: de 5° até 90° (evita 0° para não dar problema)
                 theta_min = math.pi/36.0  # 5° (quase horizontal/nível do chão)
                 theta_max = math.pi/2.0   # 90° (top-down)
                 theta = theta_min + (theta_max - theta_min) * vi / float(V_ANGLES_CUBES - 1)
@@ -229,7 +217,6 @@ def main():
 
                 cam_trans.setSFVec3f([cx, cy, cz])
                 
-                # ✅ APLICAR ROTAÇÃO COM VALIDAÇÃO
                 try:
                     axis_x, axis_y, axis_z, angle = look_at_axis_angle((cx,cy,cz), target)
                     cam_rot.setSFRotation([axis_x, axis_y, axis_z, angle])
@@ -256,7 +243,6 @@ def main():
 
         print(f"[DONE] Cubo {color_name}: {cube_images} imagens geradas")
         
-        # ✅ RESTAURAR ROTAÇÃO ORIGINAL
         try:
             rot_field.setSFRotation(orig_rot)
         except:

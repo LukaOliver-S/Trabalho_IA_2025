@@ -7,6 +7,7 @@ from .movement_controller import MovementController
 from .object_detector import ObjectDetector
 from .obstacle_avoider import ObstacleAvoider
 from .sensors import SensorSuite
+from .fuzzy_controller import FuzzySimple
 
 __all__ = [
     "AlignmentController",
@@ -18,4 +19,5 @@ __all__ = [
     "ObjectDetector",
     "ObstacleAvoider",
     "SensorSuite",
+    "FuzzySimple",
 ]
