@@ -1,147 +1,204 @@
 import numpy as np
-
 class ObstacleAvoider:
     """
-    Minimal avoider:
-    - tries up to MAX_STRAFES strafes on a selected side
-    - small forward nudge if lateral space opens
-    - keeps minimal persistent state (cooldown, last side)
+    Simple obstacle avoidance strategy:
+    1. Choose strafe direction (left/right)
+    2. Strafe up to MAX_STRAFES times
+    3. Try forward nudge if lateral space opens
+    4. Stop if path clears
     """
+    
+    # Default configuration
+    MAX_STRAFES = 3
+    STRAFE_DURATION = 0.35
+    NUDGE_DURATION = 0.10
+    MIN_SIDE_CLEARANCE = 0.12
+    CENTER_ANGLE_THRESH = 0.06
+    SETTLE_TIME = 0.03
+    BACKUP_TIME = 0.30
 
-    def __init__(self, base, lidar_low, lidar_high, sensors, step_wait, dt,obstacle_min_dist =None, debug=False,fuzzy = None):
+    def __init__(self, base, lidar_low, lidar_high, sensors, step_wait, dt, 
+                 obstacle_min_dist=None, debug=False, fuzzy=None):
         self.base = base
         self.lidar_low = lidar_low
         self.lidar_high = lidar_high
         self.sensors = sensors
-        self._step_wait = step_wait
+        self.step_wait = step_wait
         self.dt = dt
-        self.DEBUG = debug
+        self.debug = debug
         self.fuzzy = fuzzy
-        # minimal persistent state
-        self.avoid_cooldown = 0
-        self.last_avoid_side = None
-        self.obstacle_min_dist = obstacle_min_dist
-    def _dbg(self, msg):
-        if self.DEBUG: print(msg)
+        
+        # Use provided obstacle_min_dist or default to 0.30
+        self.obstacle_min_dist = obstacle_min_dist if obstacle_min_dist is not None else 0.30
+        
+        # State tracking
+        self.cooldown = 0
+        self.last_side = None
 
-    def _side_min_fallback(self, ranges, side, min_angle=0.05, max_angle=1.5):
+    def _log(self, msg):
+        """Print debug message if debug enabled."""
+        if self.debug:
+            print(f"[Avoider] {msg}")
+
+    def _compute_side_min(self, ranges, side):
+        """Compute minimum distance on specified side (left/right)."""
         if ranges.size == 0 or not np.isfinite(ranges).any():
-            return float("inf")
+            return np.inf
+        
+        # Calculate angles for each point
         num = len(ranges)
         fov = self.lidar_low.getFov()
         angles = (np.arange(num) - num // 2) * (fov / num)
+        
+        # Select side mask
         if side == "left":
-            mask = (angles > min_angle) & (angles < max_angle)
-        else:
-            mask = (angles < -min_angle) & (angles > -max_angle)
-        vals = ranges[mask & np.isfinite(ranges) & (ranges > 0)]
-        return float(np.min(vals)) if vals.size else float("inf")
+            mask = (angles > 0.05) & (angles < 1.5)
+        else:  # right
+            mask = (angles < -0.05) & (angles > -1.5)
+        
+        # Get valid readings
+        valid = ranges[mask & np.isfinite(ranges) & (ranges > 0)]
+        return float(np.min(valid)) if valid.size > 0 else np.inf
 
-    def _get_side_mins(self, ranges):
+    def _get_side_distances(self, ranges):
+        """Get minimum distances on left and right sides."""
         left, right = self.sensors.compute_side_mins(ranges)
+        
+        # Fallback to manual computation if needed
         if not np.isfinite(left):
-            left = self._side_min_fallback(ranges, "left")
+            left = self._compute_side_min(ranges, "left")
         if not np.isfinite(right):
-            right = self._side_min_fallback(ranges, "right")
+            right = self._compute_side_min(ranges, "right")
+        
         return left, right
 
-    def _choose_side(self, angle_high, left_min, right_min):
-        # center threshold hard-coded (simple)
-        CENTER_ANGLE_TH = getattr(self, "CENTER_ANGLE_TH", 0.06)
-        if angle_high is not None and abs(angle_high) < CENTER_ANGLE_TH:
-            return "right" if angle_high < 0 else "left"
-        if not np.isfinite(left_min) and not np.isfinite(right_min):
+    def _choose_strafe_side(self, obstacle_angle, left_dist, right_dist):
+        """Decide which side to strafe based on obstacle position and clearance."""
+        # If obstacle is centered, strafe away from it
+        if obstacle_angle is not None and abs(obstacle_angle) < self.CENTER_ANGLE_THRESH:
+            return "left" if obstacle_angle > 0 else "right"
+        
+        # If both sides blocked, give up
+        if not np.isfinite(left_dist) and not np.isfinite(right_dist):
             return None
-        if not np.isfinite(left_min): return "right"
-        if not np.isfinite(right_min): return "left"
-        return "left" if left_min < right_min else "right"
+        
+        # Strafe toward the more open side
+        if not np.isfinite(left_dist):
+            return "right"
+        if not np.isfinite(right_dist):
+            return "left"
+        
+        return "right" if right_dist > left_dist else "left"
 
-    def _strafe_once(self, side, dur):
+    def _execute_strafe(self, side):
+        """Execute a single strafe movement."""
         if side == "left":
             self.base.strafe_left()
         else:
             self.base.strafe_right()
-        if self._step_wait:
-            self._step_wait(dur)
-            self._step_wait(0.05)
+        
+        if self.step_wait:
+            self.step_wait(self.STRAFE_DURATION)
+            self.step_wait(0.05)  # Brief settle
+
+    def _execute_nudge(self, speed=0.03):
+        """Execute a small forward nudge."""
+        self.base.move(speed, 0, 0)
+        if self.step_wait:
+            self.step_wait(self.NUDGE_DURATION)
+            self.step_wait(self.SETTLE_TIME)
 
     def start_avoid(self):
-        # only the constants we actually use
-        STRAFE_DUR = 0.35
-        MAX_STRAFES = 3
-        SIDE_MIN = 0.12
-        NUDGE_DUR = 0.10
-        MIN_CLEAR = getattr(self, "obstacle_min_dist", 0.30)
-        EPS_FRONT = 0.005
-
-        # stop and settle
+        """
+        Main avoidance routine.
+        
+        Returns:
+            bool: True if obstacle cleared, False otherwise
+        """
+        # Stop and settle
         self.base.move(0, 0, 0)
-        if self._step_wait: self._step_wait(0.03)
-
-        # cooldown
-        if self.avoid_cooldown > 0:
-            self.avoid_cooldown = max(0, self.avoid_cooldown - 1)
-            self._dbg(f"avoid cooldown {self.avoid_cooldown}")
-
-        # single snapshot and initial readings
-        low_snapshot, high_snapshot = self.sensors.snapshot()
-        min_low, min_high = self.sensors.read_lidars()
-        self._dbg(f"avoid start | low={min_low:.3f} high={min_high:.3f}")
-
-        angle_high = self.sensors.get_high_min_angle() if (high_snapshot.size and np.isfinite(high_snapshot).any()) else None
-        left_min, right_min = self._get_side_mins(low_snapshot)
-        self._dbg(f"left={left_min:.3f} right={right_min:.3f}")
-          
-        side = self._choose_side(angle_high, left_min, right_min)
-        if side is None:
-            self.avoid_cooldown = 2
+        if self.step_wait:
+            self.step_wait(self.SETTLE_TIME)
+        
+        # Handle cooldown
+        if self.cooldown > 0:
+            self.cooldown = max(0, self.cooldown - 1)
+            self._log(f"Cooldown: {self.cooldown}")
             return False
-        self._dbg(f"trying side: {side}")
-
-        freed = False
-        for i in range(MAX_STRAFES):
-            self._dbg(f"strafe {side} {i+1}/{MAX_STRAFES}")
-            self._strafe_once(side, STRAFE_DUR)
-
-            # fresh snapshot and front reading
-            low_snapshot, _ = self.sensors.snapshot()
-            new_front, _ = self.sensors.read_lidars()
-
-            # abort if front got worse
-            if np.isfinite(new_front) and new_front < MIN_CLEAR - EPS_FRONT:
-                self._dbg(f"front worse {new_front:.3f} -> abort")
-                self.base.move(-0.03, 0, 0)
-                if self._step_wait: self._step_wait(0.30)
+        
+        # Get sensor readings
+        low_scan, high_scan = self.sensors.snapshot()
+        front_low, front_high = self.sensors.read_lidars()
+        
+        self._log(f"Start | front_low={front_low:.3f} front_high={front_high:.3f}")
+        
+        # Get obstacle angle from high lidar
+        obstacle_angle = None
+        if high_scan.size > 0 and np.isfinite(high_scan).any():
+            obstacle_angle = self.sensors.get_high_min_angle()
+        
+        # Get side clearances
+        left_dist, right_dist = self._get_side_distances(low_scan)
+        self._log(f"Sides | left={left_dist:.3f} right={right_dist:.3f}")
+        
+        # Choose strafe direction
+        side = self._choose_strafe_side(obstacle_angle, left_dist, right_dist)
+        if side is None:
+            self._log("No valid side to strafe")
+            self.cooldown = 2
+            return False
+        
+        self._log(f"Strafing {side}")
+        
+        # Try strafing with optional forward nudges
+        for attempt in range(self.MAX_STRAFES):
+            self._log(f"Attempt {attempt + 1}/{self.MAX_STRAFES}")
+            
+            # Execute strafe
+            self._execute_strafe(side)
+            
+            # Check new front distance
+            low_scan, _ = self.sensors.snapshot()
+            front_dist, _ = self.sensors.read_lidars()
+            
+            # If front distance got worse, back off and abort
+            if np.isfinite(front_dist) and front_dist < self.obstacle_min_dist:
+                self._log(f"Front blocked: {front_dist:.3f} < {self.obstacle_min_dist:.3f}")
+                self._execute_nudge(speed=-0.03)
+                if self.step_wait:
+                    self.step_wait(self.BACKUP_TIME)
                 break
-
-            # success if cleared
-            if np.isfinite(new_front) and new_front >= MIN_CLEAR - EPS_FRONT:
-                freed = True
-                self._dbg("freed after strafe")
-                break
-
-            # if side improved, try small forward nudge
-            cur_left, cur_right = self._get_side_mins(low_snapshot)
-            lateral_ok = (side == "left" and cur_left >= SIDE_MIN) or (side == "right" and cur_right >= SIDE_MIN)
-            if lateral_ok:
-                self._dbg("lateral ok -> forward nudge")
-                self.base.move(0.03, 0, 0)
-                if self._step_wait: self._step_wait(NUDGE_DUR)
-                if self._step_wait: self._step_wait(0.03)
-                after_nudge, _ = self.sensors.read_lidars()
-                if np.isfinite(after_nudge) and after_nudge >= MIN_CLEAR - EPS_FRONT:
-                    freed = True
-                    self._dbg("freed after nudge")
-                    break
-
-        # final state updates
-        if freed:
-            self.avoid_cooldown = max(1, int(0.6 / (self.dt if self.dt > 0 else 0.05)))
-            self.last_avoid_side = side
-            self._dbg("avoid succeeded")
-        else:
-            self.avoid_cooldown = 2
-            self._dbg("avoid failed - cooldown set")
-
+            
+            # Success - path is clear
+            if np.isfinite(front_dist) and front_dist >= self.obstacle_min_dist:
+                self._log(f"Path clear: {front_dist:.3f} >= {self.obstacle_min_dist:.3f}")
+                self._set_success(side)
+                return True
+            
+            # Check if lateral space opened up
+            left_dist, right_dist = self._get_side_distances(low_scan)
+            side_dist = left_dist if side == "left" else right_dist
+            
+            if side_dist >= self.MIN_SIDE_CLEARANCE:
+                self._log(f"Side opened ({side_dist:.3f}) -> trying nudge")
+                self._execute_nudge()
+                
+                # Check if nudge cleared the path
+                front_dist, _ = self.sensors.read_lidars()
+                if np.isfinite(front_dist) and front_dist >= self.obstacle_min_dist:
+                    self._log(f"Path clear after nudge: {front_dist:.3f}")
+                    self._set_success(side)
+                    return True
+        
+        # Failed to clear obstacle
+        self._log("Failed to clear obstacle")
+        self.cooldown = 2
         self.base.move(0, 0, 0)
-        return freed
+        return False
+
+    def _set_success(self, side):
+        """Update state after successful avoidance."""
+        self.last_side = side
+        self.cooldown = max(1, int(0.6 / max(self.dt, 0.05)))
+        self.base.move(0, 0, 0)
+        self._log("Avoidance succeeded")
