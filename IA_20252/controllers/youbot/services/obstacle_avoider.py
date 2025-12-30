@@ -1,4 +1,6 @@
 import numpy as np
+
+
 class ObstacleAvoider:
     """
     Simple obstacle avoidance strategy:
