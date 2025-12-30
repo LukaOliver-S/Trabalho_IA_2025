@@ -32,6 +32,7 @@ class YouBotConfig:
     cube_height: float = 0.03
     distance_diff_thresh: float = 0.01
     min_approach_distance:float = 0.30
+    v_max:float = 0.15
 
 class YouBotController:
     def __init__(self):
@@ -107,7 +108,7 @@ class YouBotController:
 
     def _init_components(self):
         # hardware wrappers and logic components
-        self.fuzzy = FuzzySimple()
+        self.fuzzy = FuzzySimple(v_max = self.config.v_max)
 
         self.base = Base(self.robot)
         self.arm = Arm(self.robot)
@@ -220,7 +221,7 @@ class YouBotController:
         """Inicia a rotação em direção a target_angle (não-bloqueante)."""
         self.target_angle = target_angle % 360
         self.rotating = True
-        self.rotation_started = False  # reinicia a inicialização da direção
+        self.rotation_started = False  
 
     def rotate_left_90(self):
         """Gira 90° para a esquerda a partir do ângulo atual."""
@@ -243,33 +244,31 @@ class YouBotController:
         current_angle = self.get_current_angle()
         diff = self.angle_diff(self.target_angle, current_angle)
 
-        deadzone = 0.2
-        max_speed = 1.0
-        slow_zone = 15.0
-
-        # Inicializa a direção apenas no início
-        if not self.rotation_started:
-            if diff == 0:
-                self.rotation_direction = 0
-            else:
-               
-                self.rotation_direction = -1 if diff > 0 else 1
-            self.rotation_started = True
-        print(current_angle)
-        # Se dentro do deadzone, parar de girar
+        # params
+        deadzone = 0.5      
+        max_speed = 1.0     
+        min_speed = 0.08   
+        slow_zone = 15.0    
+        #print(current_angle)
+        # stop if within deadzone
         if abs(diff) <= deadzone:
             self.base.move(0, 0, 0)
             self.rotating = False
-            self.rotation_started = False
             return
 
-        # Velocidade proporcional
-        speed = max_speed
-        if abs(diff) < slow_zone:
-            speed *= 0.3
+        # speed scaled with error magnitude (smooth, proportional-ish)
+        if abs(diff) >= slow_zone:
+            speed = max_speed
+        else:
+            frac = abs(diff) / slow_zone
+            speed = min_speed + (max_speed - min_speed) * frac
+            speed = max(min_speed, min(speed, max_speed))
 
-        # Gira na direção 
-        self.base.move(0, 0, speed * self.rotation_direction)
+        # choose rotation sign based on error each tick (avoid stale direction)
+        direction = -1 if diff > 0 else 1
+        angular = direction * speed
+
+        self.base.move(0, 0, angular)
 
 
 
@@ -351,7 +350,7 @@ class YouBotController:
             
             if pose is not None:
                 self.lidar_pose = pose
-                if self.DEBUG:
+                if  self.DEBUG:
                     print(f"LidarGPS pose: x={pose[0]:.3f}, y={pose[1]:.3f}")
             if not self.handle_keyboard_input():
                 break

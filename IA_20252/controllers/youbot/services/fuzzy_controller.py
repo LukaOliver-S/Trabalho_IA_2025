@@ -7,7 +7,8 @@ class FuzzySimple:
     """Simple fuzzy speed selector based only on frontal distance (LIDAR)."""
     LIDAR_MAX = 0.5  # máximo alcance do LIDAR em metros
 
-    def __init__(self):
+    def __init__(self, v_max: float = 0.30):
+        self.v_max = v_max 
         # Entrada: distância frontal (ajustada ao alcance do lidar)
         self.dist_front = ctrl.Antecedent(
             np.arange(0.0, self.LIDAR_MAX + 0.001, 0.005), 'dist_front'
@@ -17,7 +18,10 @@ class FuzzySimple:
             np.arange(-0.5, 0.51, 0.01), 'lateral_offset'
         )
         # Saída única: velocidade (vx = vy), intervalo [0.0, 0.30] m/s
-        self.v = ctrl.Consequent(np.arange(0.0, 0.305, 0.005), 'v')
+        self.v = ctrl.Consequent(
+            np.arange(0.0, self.v_max + 0.001, 0.005), 'v'
+        )
+
 
         # Funções de pertinência (distância) — ajustadas para [0, LIDAR_MAX]
         self.dist_front['near'] = fuzz.trimf(
@@ -51,11 +55,11 @@ class FuzzySimple:
      
      
         # Funções de pertinência (velocidade) — baixa / média / alta
-        self.v['very_low']  = fuzz.trimf(self.v.universe, [0.00, 0.03, 0.06])
-        self.v['low']       = fuzz.trimf(self.v.universe, [0.05, 0.08, 0.11])
-        self.v['medium']    = fuzz.trimf(self.v.universe, [0.10, 0.15, 0.20])
-        self.v['high']      = fuzz.trimf(self.v.universe, [0.19, 0.23, 0.27])
-        self.v['very_high'] = fuzz.trimf(self.v.universe, [0.26, 0.29, 0.30])
+        self.v['very_low']  = fuzz.trimf(self.v.universe, [0.00 * self.v_max, 0.10 * self.v_max, 0.20 * self.v_max])
+        self.v['low']       = fuzz.trimf(self.v.universe, [0.1667 * self.v_max, 0.2667 * self.v_max, 0.3667 * self.v_max])
+        self.v['medium']    = fuzz.trimf(self.v.universe, [0.3333 * self.v_max, 0.50 * self.v_max, 0.6667 * self.v_max])
+        self.v['high']      = fuzz.trimf(self.v.universe, [0.6333 * self.v_max, 0.7667 * self.v_max, 0.90 * self.v_max])
+        self.v['very_high'] = fuzz.trimf(self.v.universe, [0.8667 * self.v_max, 0.9667 * self.v_max, 1.00 * self.v_max])
 
         # Compatibilidade com notebooks que esperam vx, vy
         self.vx = self.v

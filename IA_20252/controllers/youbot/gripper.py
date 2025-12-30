@@ -82,3 +82,19 @@ class Gripper:
             bool: True if gripper is gripping
         """
         return self.is_gripping
+    
+    def current_position(self):
+        """Return the motor position (or None if unavailable)."""
+        if not self.finger:
+            return None
+        try:
+            return float(self.finger.getPosition())
+        except Exception:
+            return None
+
+    def current_gap(self):
+        """Return the estimated gap (m) based on motor position, or None."""
+        pos = self.current_position()
+        if pos is None:
+            return None
+        return 2.0 * pos + OFFSET_WHEN_LOCKED
