@@ -89,12 +89,16 @@ class YouBotController:
         self.lidar_high = self.robot.getDevice("lidar_horizontal_2")
         self.lidar_global = self.robot.getDevice("lidar")
         self.compass = self.robot.getDevice("compass")
-
+         
+        self.lidar_right = self.robot.getDevice("lidar right")
+        self.lidar_left = self.robot.getDevice("lidar left")
         missing = [n for n, d in (
             ("lidar_horizontal", self.lidar_low),
             ("lidar_horizontal_2", self.lidar_high),
             ("lidar", self.lidar_global),
             ("compass", self.compass),
+            ("lidar left", self.lidar_left),
+            ("lidar right", self.lidar_right)
         ) if d is None]
         if missing:
             print(f"ERRO: dispositivos faltando: {', '.join(missing)}", file=sys.stderr)
@@ -105,7 +109,8 @@ class YouBotController:
         self.lidar_high.enable(self.time_step)
         self.lidar_global.enable(self.time_step)
         self.compass.enable(self.time_step)
-
+        self.lidar_left.enable(self.time_step)   
+        self.lidar_right.enable(self.time_step)
     def _init_components(self):
         # hardware wrappers and logic components
         self.fuzzy = FuzzySimple(v_max = self.config.v_max)
@@ -114,7 +119,14 @@ class YouBotController:
         self.arm = Arm(self.robot)
         self.gripper = Gripper(self.robot)
         
-        self.sensors = SensorSuite(self.lidar_low, self.lidar_high, self.compass, step_wait=self._step_wait)
+        self.sensors = SensorSuite(
+            self.lidar_low,
+            self.lidar_high,
+            self.compass,
+            step_wait=self._step_wait,
+            lidar_high_left=self.lidar_right,  
+            lidar_high_right=self.lidar_left   
+        )
         self.movement = MovementController(
             self.base,
             step_wait=self._step_wait,
@@ -122,12 +134,13 @@ class YouBotController:
             strafe_speed=0.1,
             movement_duration=10,
             fuzzy=self.fuzzy,
-            front_dist_fn=self.sensors.read_low_filtered
+            front_dist_fn=self.sensors.read_low_filtered,
+            side_dist_fn=self.sensors.read_side_distances,  
         )
         self.lidar_gps = LidarGpsController(
             self.lidar_global,
-            model_path=Path("./models/lidar_pose_cnn_temporal_2_KAGGLE.pth"),
-            T=5,
+            model_path=Path("./models/lidar_gps_best_4.pth"),
+            T=2,
             max_range=5.5,
             debug=self.DEBUG,
         )
@@ -350,7 +363,7 @@ class YouBotController:
             
             if pose is not None:
                 self.lidar_pose = pose
-                if  self.DEBUG:
+                if not  self.DEBUG:
                     print(f"LidarGPS pose: x={pose[0]:.3f}, y={pose[1]:.3f}")
             if not self.handle_keyboard_input():
                 break
@@ -372,6 +385,8 @@ class YouBotController:
             else:
               
                 self.update_movement()
+                if not self.DEBUG:
+                    print("SIDE:", self.sensors.read_side_distances())
             self.update_rotation()
 
         self.base.move(0, 0, 0)

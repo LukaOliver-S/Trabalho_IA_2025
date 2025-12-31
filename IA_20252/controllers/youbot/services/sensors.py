@@ -4,7 +4,8 @@ import numpy as np
 import math
 
 class SensorSuite:
-    def __init__(self, lidar_low, lidar_high, compass, step_wait: Callable[[float], None] = None):
+    def __init__(self, lidar_low, lidar_high, compass, step_wait: Callable[[float], None] = None,
+             lidar_high_left=None, lidar_high_right=None):
         self.lidar_low = lidar_low
         self.lidar_high = lidar_high
         self.compass = compass
@@ -14,7 +15,15 @@ class SensorSuite:
         self._last_high = None
         if self.lidar_low: self.lidar_low.enablePointCloud()
         if self.lidar_high: self.lidar_high.enablePointCloud()
+        
+        self.lidar_high_left = lidar_high_left
+        self.lidar_high_right = lidar_high_right
+        if self.lidar_high_left: self.lidar_high_left.enablePointCloud()
+        if self.lidar_high_right: self.lidar_high_right.enablePointCloud()
 
+
+
+    
     def snapshot(self) -> Tuple[np.ndarray, np.ndarray]:
         """Read both lidars once, cache results, and return (low, high) arrays."""
         low = np.array(self.lidar_low.getRangeImage(), dtype=np.float32) if self.lidar_low else np.array([], dtype=np.float32)
@@ -127,3 +136,44 @@ class SensorSuite:
             if np.isfinite(low):
                 vals.append(low)
         return float(np.median(vals)) if vals else float("inf")
+    
+    # ================ RIGHT/LEFT LIDARS ============================================
+    def _min_range_array(self, arr: np.ndarray) -> float:
+        """Return min positive finite value or inf (reuses filtering logic)."""
+        if arr is None or arr.size == 0:
+            return float('inf')
+        vals = arr[np.isfinite(arr) & (arr > 0)]
+        return float(np.min(vals)) if vals.size else float('inf')
+
+    def get_high_left_ranges(self) -> np.ndarray:
+        return np.array(self.lidar_high_left.getRangeImage(), dtype=np.float32) \
+            if self.lidar_high_left else np.array([], dtype=np.float32)
+
+    def get_high_right_ranges(self) -> np.ndarray:
+        return np.array(self.lidar_high_right.getRangeImage(), dtype=np.float32) \
+            if self.lidar_high_right else np.array([], dtype=np.float32)
+            
+    def read_side_distances(self) -> Tuple[float, float]:
+        """
+        Returns (left_min, right_min). Prefer left/right high lidars if available,
+        otherwise fall back to compute_side_mins() (low lidar).
+        """
+        left = self._min_range_array(self.get_high_left_ranges())
+        right = self._min_range_array(self.get_high_right_ranges())
+
+       
+        return left, right
+    
+    def _get_side_distances(self, ranges):
+        # Prefer explicit side lidar readings if provided
+        if hasattr(self.sensors, "read_side_distances"):
+            left, right = self.sensors.read_side_distances()
+            if np.isfinite(left) or np.isfinite(right):
+                return left, right
+        # fallback to existing logic (unchanged)
+        left, right = self.sensors.compute_side_mins(ranges)
+        if not np.isfinite(left):
+            left = self._compute_side_min(ranges, "left")
+        if not np.isfinite(right):
+            right = self._compute_side_min(ranges, "right")
+        return left, right

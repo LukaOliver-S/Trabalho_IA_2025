@@ -24,7 +24,7 @@ GAP_MIN = 0.0
 GAP_MAX = 0.05     
 
 # Tamanho do cubo (aresta)
-CUBE_SIZE = 0.003   
+CUBE_SIZE = 0.00015 
 
 def bound(value, min_val, max_val):
     """Clamp value between min and max"""
@@ -107,7 +107,7 @@ class Gripper:
         gap = GAP_MIN + alpha * (GAP_MAX - GAP_MIN)
         return bound(gap, GAP_MIN, GAP_MAX)
 
-    def check_cube_grasped(self, tol=1e-3):
+    def check_cube_grasped(self):
         """Atualiza e retorna se o cubo de 3 cm foi realmente pego.
 
         Lógica:
@@ -115,9 +115,9 @@ class Gripper:
           - se gap final >= CUBE_SIZE - tol => dedos travaram no cubo => pegou
         """
         gap = self.current_gap()
-        print(CUBE_SIZE - tol)
+        print(CUBE_SIZE)
         print(gap)
-        if gap < CUBE_SIZE - tol:
+        if gap < CUBE_SIZE:
             # conseguiu fechar demais: não travou no cubo
             self.has_cube = False
         else:

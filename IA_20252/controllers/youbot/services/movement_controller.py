@@ -5,18 +5,11 @@ from typing import Callable, Optional
 class MovementController:
     """Controls robot movement with fuzzy speed adaptation."""
 
-    def __init__(
-        self,
-        base,
-        step_wait: Optional[Callable[[float], None]] = None,
-        compass=None,
-        forward_speed: float = 0.1,
-        strafe_speed: float = 0.1,
-        movement_duration: int = 10,
-        fuzzy=None,
-        front_dist_fn: Optional[Callable[[], float]] = None,
-        debug: bool = True,
-    ):
+    def __init__(self, base, step_wait: Optional[Callable[[float], None]] = None,
+             compass=None, forward_speed: float = 0.1, strafe_speed: float = 0.1,
+             movement_duration: int = 10, fuzzy=None, front_dist_fn: Optional[Callable[[], float]] = None,
+             side_dist_fn: Optional[Callable[[], tuple]] = None,
+             debug: bool = False):
         self.base = base
         self._step_wait = step_wait
         self.compass = compass
@@ -29,7 +22,8 @@ class MovementController:
         # Fuzzy integration
         self.fuzzy = fuzzy
         self.front_dist_fn = front_dist_fn
-        
+        self.side_dist_fn = side_dist_fn
+            
         # State flags
         self.block_forward = False  # Set by obstacle avoidance
         self.is_picking = False     # Set during pick action
@@ -47,7 +41,10 @@ class MovementController:
     def set_front_dist_fn(self, fn: Callable[[], float]):
         """Update front distance sensor function."""
         self.front_dist_fn = fn
-
+        
+    def set_side_dist_fn(self, fn: Callable[[], tuple]):
+        self.side_dist_fn = fn
+        
     # ========================================================================
     # MOVEMENT COMMANDS
     # ========================================================================
@@ -94,55 +91,64 @@ class MovementController:
             return d if np.isfinite(d) else None
         except Exception:
             return None
+        
+    def _get_side_distances(self):
+        """Get minimum distances on left and right sides."""
+        # Prefer explicit side-lidar readings if provided by SensorSuite
+        if hasattr(self.sensors, "read_side_distances"):
+                left, right = self.sensors.read_side_distances()
+                if np.isfinite(left) or np.isfinite(right):
+                    return left, right
+           
 
-    def _compute_speed(self) -> tuple[float, float]:
+    def _compute_speed(self, side_hint: Optional[str] = None) -> tuple[float, float]:
         """
-        Compute (vx_speed, vy_speed) using fuzzy controller if available.
-        Returns fallback speeds if fuzzy unavailable or fails.
+        Compute vx from frontal distance and vy from the chosen side distance using
+        the same fuzzy (keeps FuzzySimple unchanged).
+        side_hint: 'left' or 'right' when a lateral move is requested (optional).
         """
-        # No fuzzy controller -> use nominal speeds
-        if self.fuzzy is None:
-            return self.forward_speed, self.strafe_speed
-        
-        # Get front distance
-        dist = self._get_front_distance()
-        
-        # If invalid, use LIDAR_MAX as fallback
-        if dist is None:
-            lidar_max = getattr(self.fuzzy, "LIDAR_MAX", None)
-            if lidar_max is None:
-                if self.debug:
-                    print("[Movement] No valid distance, no LIDAR_MAX -> fallback speed")
-                return self.forward_speed, self.strafe_speed
-            dist = float(lidar_max)
-            if self.debug:
-                print(f"[Movement] Invalid distance -> using LIDAR_MAX={dist:.3f}")
-        
-        # Clip to valid lidar range
-        lidar_max = getattr(self.fuzzy, "LIDAR_MAX", None)
-        if lidar_max is not None:
-            dist = np.clip(dist, 0.0, float(lidar_max))
-        
-        # Compute fuzzy velocities
+        # front distance with fallback
+        front = self._get_front_distance()
+        if front is None or not np.isfinite(front):
+            front = float(getattr(self.fuzzy, "LIDAR_MAX", 0.5))
+
+        # get safe side distances
+        left = right = float(getattr(self.fuzzy, "LIDAR_MAX", 0.5))
+        if getattr(self, "side_dist_fn", None) is not None:
+            try:
+                l, r = self.side_dist_fn()
+                left = float(l) if np.isfinite(l) else left
+                right = float(r) if np.isfinite(r) else right
+            except Exception:
+                pass
+
+        # choose lateral input
+        if side_hint == "left":
+            side_input = left
+        elif side_hint == "right":
+            side_input = right
+        else:
+            side_input = min(left, right)
+
+        # compute fuzzy outputs (reuse same fuzzy)
         try:
-            vx, vy = self.fuzzy.compute_velocity(dist)
-            
-            # Get fuzzy universe limits (or use nominal as fallback)
+            vx_val, _ = self.fuzzy.compute_velocity(front)
+            _, vy_val = self.fuzzy.compute_velocity(side_input)
+
             try:
                 v_max = float(max(self.fuzzy.v.universe))
             except Exception:
-                v_max = max(self.forward_speed, abs(vx), abs(vy))
-            
-            # Clip to valid range
-            vx_speed = np.clip(abs(vx), 0.0, v_max)
-            vy_speed = np.clip(abs(vy), 0.0, v_max)
-            
+                v_max = max(self.forward_speed, abs(vx_val), abs(vy_val))
+
+            vx_speed = np.clip(abs(vx_val), 0.0, v_max)
+            vy_speed = np.clip(abs(vy_val), 0.0, v_max)
+
             if self.debug:
-                print(f"[Movement] dist={dist:.3f} -> fuzzy(vx={vx:.3f}, vy={vy:.3f}) "
-                      f"-> use({vx_speed:.3f}, {vy_speed:.3f})")
-            
+                print(f"[Movement] front={front:.3f} side_in={side_input:.3f} "
+                    f"-> fuzzy(vx={vx_val:.3f}, vy={vy_val:.3f}) -> use({vx_speed:.3f}, {vy_speed:.3f})")
+
             return vx_speed, vy_speed
-            
+
         except Exception as e:
             if self.debug:
                 print(f"[Movement] Fuzzy compute failed: {e} -> fallback speed")
@@ -172,9 +178,15 @@ class MovementController:
                 self.base.move(0, 0, 0)
                 return
         
-        # Compute adaptive speeds
-        forward_speed, lateral_speed = self._compute_speed()
-        
+        # determine lateral hint
+        side_hint = None
+        if self.counters["left"] > 0:
+            side_hint = "left"
+        elif self.counters["right"] > 0:
+            side_hint = "right"
+
+        forward_speed, lateral_speed = self._compute_speed(side_hint=side_hint)
+                
         # Determine velocities from counters
         vx = 0.0
         if self.counters["forward"] > 0:
