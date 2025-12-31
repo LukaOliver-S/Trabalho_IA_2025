@@ -27,7 +27,6 @@ class BlockHandler:
         print(f"Iniciando pick para bloco {label}...")
         
         # Incrementa o contador
-        self.counter += 1
         
         if self.robo.arm.current_orientation != self.robo.arm.FRONT:
             self.robo.arm.set_orientation(self.robo.arm.FRONT)
@@ -45,27 +44,31 @@ class BlockHandler:
         # Pegar o bloco
         self.robo.gripper.grip()
         self.robo.wait(300)
-        print("Bloco agarrado!")
-        
-        # Levantar
-        self.robo.arm.set_orientation(self.robo.arm.FRONT)
-        self.robo.wait(550)
-        
-        # Vai para a pose de armazenamento
-        self.robo.arm.set_pose(self.counter)
-        self.robo.wait(550)
-        
-        # Soltar o bloco
-        self.robo.gripper.release()
-        self.robo.wait(300)
-        
-        # Registra o bloco na cor correspondente
-        self.blocks_by_color[label].append(self.counter)
-        print(f"Bloco {label} armazenado na posição {self.counter}!")
-        
+        # current gap approx:0.07100000000000001
+        print(self.robo.gripper.check_cube_grasped())
+        if self.robo.gripper.has_object():
+            print("Bloco agarrado!")
+            self.counter+=1
+            # Levantar
+            self.robo.arm.set_orientation(self.robo.arm.FRONT)
+            self.robo.wait(550)
+            
+            # Vai para a pose de armazenamento
+            self.robo.arm.set_pose(self.counter)
+            self.robo.wait(550)
+            
+            # Soltar o bloco
+            self.robo.gripper.release()
+            self.robo.wait(300)
+            
+            # Registra o bloco na cor correspondente
+            self.blocks_by_color[label].append(self.counter)
+            print(f"Bloco {label} armazenado na posição {self.counter}!")
+        else:
+            print("Bloco não pego!")
         self.robo.arm.reset(self.robo.arm.RESET2)
         self.robo.wait(200)
-    
+
     def store(self, label):
         """
         Pega blocos de uma cor específica da base traseira e coloca na caixa

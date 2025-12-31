@@ -16,10 +16,15 @@ limitations under the License.
 Description: Python wrapper for YouBot gripper control
 """
 
-# Gripper positions
-MIN_POS = 0.0
-MAX_POS = 0.025
-OFFSET_WHEN_LOCKED = 0.021
+
+MIN_POS = 0.0      
+MAX_POS = 0.025   
+
+GAP_MIN = 0.0     
+GAP_MAX = 0.05     
+
+# Tamanho do cubo (aresta)
+CUBE_SIZE = 0.003   
 
 def bound(value, min_val, max_val):
     """Clamp value between min and max"""
@@ -27,74 +32,103 @@ def bound(value, min_val, max_val):
 
 class Gripper:
     """Controls the YouBot parallel gripper"""
-    
+
     def __init__(self, robot):
-        """Initialize gripper motors
-        
+        """Initialize gripper motors and sensors
+
         Args:
             robot: Webots Robot instance
         """
         self.robot = robot
         self.time_step = int(robot.getBasicTimeStep())
-        
-        # Get gripper finger motor (single motor controls both fingers)
+
+        # Motor do dedo (controla os dois dedos)
         self.finger = robot.getDevice("finger::left")
-        
-        # Set velocity for position control
+
+        # Encoder linear do dedo
+        self.finger_sensor = robot.getDevice("finger::leftsensor")
+        if self.finger_sensor:
+            self.finger_sensor.enable(self.time_step)
+
+        # Configura velocidade
         if self.finger:
             self.finger.setVelocity(0.03)
         else:
             print("Warning: Could not find gripper motor 'finger::left'")
-        
-        # Current state
-        self.is_gripping = False
-    
+
+        self.is_gripping = False   
+        self.has_cube = False      
+
+    # ---------- comandos básicos ----------
     def grip(self):
-        """Close gripper to grip an object"""
+        """Fecha totalmente a garra (tenta agarrar)"""
         if self.finger:
             self.finger.setPosition(MIN_POS)
         self.is_gripping = True
-    
+        self.has_cube = False  
+
     def release(self):
-        """Open gripper to release an object"""
+        """Abre totalmente a garra (solta qualquer coisa)"""
         if self.finger:
             self.finger.setPosition(MAX_POS)
         self.is_gripping = False
-    
+        self.has_cube = False
+
     def set_gap(self, gap):
         """Set gripper to a specific gap width between fingers
-        
+
         Args:
             gap: desired gap between fingers in meters
         """
-        # Calculate motor position with offset compensation
-        v = bound(0.5 * (gap - OFFSET_WHEN_LOCKED), MIN_POS, MAX_POS)
-        
+        gap = bound(gap, GAP_MIN, GAP_MAX)
+
+        # mapeia gap -> posição do atuador linear (assumindo relação linear)
+        alpha = (gap - GAP_MIN) / (GAP_MAX - GAP_MIN)
+        pos = MIN_POS + alpha * (MAX_POS - MIN_POS)
+        pos = bound(pos, MIN_POS, MAX_POS)
+
         if self.finger:
-            self.finger.setPosition(v)
-        
-        self.is_gripping = (v < MAX_POS / 2)
-    
-    def is_closed(self):
-        """Check if gripper is in closed/gripping state
-        
-        Returns:
-            bool: True if gripper is gripping
-        """
-        return self.is_gripping
-    
-    def current_position(self):
-        """Return the motor position (or None if unavailable)."""
-        if not self.finger:
-            return None
-        try:
-            return float(self.finger.getPosition())
-        except Exception:
-            return None
+            self.finger.setPosition(pos)
+
+        self.is_gripping = (gap <= CUBE_SIZE)  
+       
+
+    # ---------- leitura ----------
+    def current_pos(self):
+        """Posição atual do atuador linear (m)"""
+        if not self.finger_sensor:
+            return MIN_POS
+        return float(self.finger_sensor.getValue())
 
     def current_gap(self):
-        """Return the estimated gap (m) based on motor position, or None."""
-        pos = self.current_position()
-        if pos is None:
-            return None
-        return 2.0 * pos + OFFSET_WHEN_LOCKED
+        """Gap estimado entre os dedos (m)"""
+        pos = self.current_pos()
+        alpha = (pos - MIN_POS) / (MAX_POS - MIN_POS)
+        gap = GAP_MIN + alpha * (GAP_MAX - GAP_MIN)
+        return bound(gap, GAP_MIN, GAP_MAX)
+
+    def check_cube_grasped(self, tol=1e-3):
+        """Atualiza e retorna se o cubo de 3 cm foi realmente pego.
+
+        Lógica:
+          - se depois de fechar o gap final for < CUBE_SIZE => dedos passaram do cubo => não pegou
+          - se gap final >= CUBE_SIZE - tol => dedos travaram no cubo => pegou
+        """
+        gap = self.current_gap()
+        print(CUBE_SIZE - tol)
+        print(gap)
+        if gap < CUBE_SIZE - tol:
+            # conseguiu fechar demais: não travou no cubo
+            self.has_cube = False
+        else:
+            # dedos não conseguiram fechar além do tamanho do cubo
+            self.has_cube = True
+
+        return self.has_cube
+
+    # ---------- estados ----------
+    def is_closed(self):
+        return self.is_gripping
+
+    def has_object(self):
+        return self.has_cube
