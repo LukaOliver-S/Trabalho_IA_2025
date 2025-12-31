@@ -1,4 +1,3 @@
-# controllers/youbot/youbot_auxiliar/AngleController.py
 import math
 
 class AngleController:

@@ -1,4 +1,3 @@
-# controllers/youbot/youbot_auxiliar/Sensors.py
 from typing import Tuple, Callable
 import numpy as np
 import math
