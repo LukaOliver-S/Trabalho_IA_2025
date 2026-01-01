@@ -8,6 +8,8 @@ from .object_detector import ObjectDetector
 from .obstacle_avoider import ObstacleAvoider
 from .sensors import SensorSuite
 from .fuzzy_controller import FuzzySimple
+from .navigation_controller import NavigationController
+from .mission_controller import MissionController
 
 __all__ = [
     "AlignmentController",
@@ -20,4 +22,6 @@ __all__ = [
     "ObstacleAvoider",
     "SensorSuite",
     "FuzzySimple",
+     "NavigationController",
+      "MissionController",
 ]

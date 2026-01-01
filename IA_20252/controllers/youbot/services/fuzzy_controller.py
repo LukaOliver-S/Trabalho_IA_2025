@@ -5,7 +5,7 @@ from skfuzzy import control as ctrl
 
 class FuzzySimple:
     """Simple fuzzy speed selector based only on frontal distance (LIDAR)."""
-    LIDAR_MAX = 0.5  # máximo alcance do LIDAR em metros
+    LIDAR_MAX = 0.3  # máximo alcance do LIDAR em metros
 
     def __init__(self, v_max: float = 0.30):
         self.v_max = v_max 
@@ -13,10 +13,7 @@ class FuzzySimple:
         self.dist_front = ctrl.Antecedent(
             np.arange(0.0, self.LIDAR_MAX + 0.001, 0.005), 'dist_front'
         )
-        # Entrada compatível (não usada no cálculo, só para visualização)
-        self.lateral_offset = ctrl.Antecedent(
-            np.arange(-0.5, 0.51, 0.01), 'lateral_offset'
-        )
+      
         # Saída única: velocidade (vx = vy), intervalo [0.0, 0.30] m/s
         self.v = ctrl.Consequent(
             np.arange(0.0, self.v_max + 0.001, 0.005), 'v'
@@ -35,12 +32,7 @@ class FuzzySimple:
         )
 
 
-        # Funções de pertinência (lateral) — apenas para plot compatível
-        self.lateral_offset['left'] = fuzz.trimf(self.lateral_offset.universe, [-0.5, -0.25, 0.0])
-        self.lateral_offset['center'] = fuzz.trimf(self.lateral_offset.universe, [-0.05, 0.0, 0.05])
-        self.lateral_offset['right'] = fuzz.trimf(self.lateral_offset.universe, [0.0, 0.25, 0.5])
-
-
+      
 
         #self.v['low'] = fuzz.trimf(self.v.universe, [0.00, 0.05, 0.12])
         #self.v['medium'] = fuzz.trimf(self.v.universe, [0.08, 0.15, 0.22])
@@ -66,7 +58,6 @@ class FuzzySimple:
         self.vy = self.v
 
         # Regras fuzzy (apenas por distância frontal)
-        # Regras fuzzy (apenas por distância frontal) – versão suave, sem OR no consequente
         rules = [
             # Bem perto: ativa very_low e low com duas regras
             ctrl.Rule(self.dist_front['near'], self.v['very_low']),
