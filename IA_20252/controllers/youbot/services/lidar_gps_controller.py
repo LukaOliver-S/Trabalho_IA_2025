@@ -36,40 +36,44 @@ class LidarPoseCNN(nn.Module):
 
 
 class LidarPoseLight(nn.Module):
+    """Lightweight model that accepts yaw (cos, sin) as extra inputs to the head."""
     def __init__(self, T, n_rays, n_out=2):
         super().__init__()
         # Canais reduzidos e pooling mais agressivo no eixo angular (W = n_rays)
         self.features = nn.Sequential(
-            nn.Conv2d(1, 16, kernel_size=(3,5), padding=(1,2)),  
+            nn.Conv2d(1, 16, kernel_size=(3,5), padding=(1,2)),
             nn.ReLU(inplace=True),
 
-            nn.Conv2d(16, 32, kernel_size=(3,5), padding=(1,2)), 
+            nn.Conv2d(16, 32, kernel_size=(3,5), padding=(1,2)),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=(1,4)),                    
+            nn.MaxPool2d(kernel_size=(1,4)),
 
             nn.Conv2d(32, 32, kernel_size=(3,5), padding=(1,2)),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=(1,4)),                     
+            nn.MaxPool2d(kernel_size=(1,4)),
         )
-
 
         with torch.no_grad():
             dummy = torch.zeros(1, 1, T, n_rays)
             out = self.features(dummy)
             flat_dim = out.view(1, -1).size(1)
 
+        # head receives extra 2 dims for yaw (cos, sin)
         self.head = nn.Sequential(
-            nn.Linear(flat_dim, 128),  
+            nn.Linear(flat_dim + 2, 128),
             nn.ReLU(inplace=True),
             nn.Linear(128, n_out),
         )
 
-    def forward(self, x):
+    def forward(self, x, yaw):
+        """
+        x: [B,1,T,n_rays]
+        yaw: [B,2] (cos, sin)
+        """
         x = self.features(x)          # [B, C, T', W']
         x = x.view(x.size(0), -1)     # [B, flat_dim]
+        x = torch.cat([x, yaw], dim=1)
         return self.head(x)
-
-
 
 
 class LidarGpsController:
@@ -77,12 +81,14 @@ class LidarGpsController:
         self,
         lidar_device,
         model_path=None,
-        T=3,
+        T=2,
         max_range=5.5,
         device=None,
         debug=False,
         use_half=False,
-        predict_every=1,   # roda a rede a cada N steps
+        predict_every=20,   # roda a rede a cada N steps
+        yaw_provider=None,  # callable -> returns (cos, sin) or None
+        model_cls=None,     # class to instantiate (LidarPoseCNN or LidarPoseLight)
     ):
         self.lidar = lidar_device
         self.model_path = Path(model_path) if model_path else None
@@ -101,6 +107,13 @@ class LidarGpsController:
         self.predict_every = max(1, int(predict_every))
         self._step_counter = 0
 
+        self.yaw_provider = yaw_provider
+        # last_yaw as default (cos=1,sin=0) -> yaw=0
+        self.last_yaw = np.array([1.0, 0.0], dtype=np.float32)
+
+        # allow user to pick model class (compatibility/test)
+        self.model_cls = model_cls or LidarPoseLight
+
     def init_after_first_step(self):
         if self.lidar is None:
             return False
@@ -113,15 +126,33 @@ class LidarGpsController:
         if self.debug:
             print(f"[LidarGpsController] n_rays = {self.n_rays}")
 
-        # instancia o modelo leve
-        self.model = LidarPoseCNN(self.T, self.n_rays).to(self.device)
+        # instantiate the requested model class
+        self.model = self.model_cls(self.T, self.n_rays).to(self.device)
 
-        # carrega pesos
+        # load weights (best-effort with some compatibility handling)
         if self.model_path and self.model_path.exists():
             state_dict = torch.load(self.model_path, map_location=self.device)
             if isinstance(state_dict, dict) and "state_dict" in state_dict:
                 state_dict = state_dict["state_dict"]
-            self.model.load_state_dict(state_dict)
+
+            # try direct load first
+            try:
+                self.model.load_state_dict(state_dict)
+                if self.debug:
+                    print("[LidarGpsController] checkpoint loaded (direct).")
+            except RuntimeError as e:
+                # attempt partial load: load matching keys only (useful when head changed)
+                if self.debug:
+                    print("[LidarGpsController] checkpoint mismatch, attempting partial load:", e)
+                model_state = self.model.state_dict()
+                filtered = {k: v for k, v in state_dict.items() if k in model_state and v.shape == model_state[k].shape}
+                model_state.update(filtered)
+                self.model.load_state_dict(model_state)
+                if self.debug:
+                    print(f"[LidarGpsController] partial weights loaded ({len(filtered)} tensors matched).")
+        else:
+            if self.debug:
+                print("[LidarGpsController] no checkpoint provided / not found.")
 
         self.model.eval()
         for p in self.model.parameters():
@@ -131,6 +162,21 @@ class LidarGpsController:
             self.model.half()
 
         return True
+
+    def _get_current_yaw(self):
+        """Return numpy array (2,) with cos,sin. Uses yaw_provider if available or last_yaw fallback."""
+        if callable(self.yaw_provider):
+            try:
+                y = self.yaw_provider()
+                if y is not None:
+                    y = np.array(y, dtype=np.float32)
+                    if y.shape == (2,):
+                        self.last_yaw = y
+                        return y
+            except Exception as e:
+                if self.debug:
+                    print("[LidarGpsController] yaw_provider error:", e)
+        return self.last_yaw
 
     def _preprocess_scan(self, scan):
         arr = np.nan_to_num(
@@ -163,21 +209,34 @@ class LidarGpsController:
         buf = np.stack(self.buffer, dtype=np.float32)      # [T, n_rays]
         X = torch.from_numpy(buf).unsqueeze(0).unsqueeze(0)  # [1,1,T,n_rays]
 
+        # prepare yaw tensor if model expects it
+        yaw_np = self._get_current_yaw().astype(np.float32)  # (2,)
+        yaw_t = torch.from_numpy(yaw_np).unsqueeze(0)        # [1,2]
+
         if self.device != "cpu":
             X = X.to(self.device, non_blocking=True)
+            yaw_t = yaw_t.to(self.device, non_blocking=True)
         if self.use_half:
             X = X.half()
+            yaw_t = yaw_t.half()
 
         t0 = time.time()
         with torch.no_grad():
-            out = self.model(X)[0].cpu().numpy()
+            # if model supports yaw (signature), call model(X, yaw_t)
+            try:
+                out = self.model(X, yaw_t)[0].cpu().numpy()
+            except TypeError:
+                # model doesn't accept yaw param (legacy): call without yaw
+                out = self.model(X)[0].cpu().numpy()
         t1 = time.time()
 
-        if  self.debug:
+        if self.debug:
             print(f"[LidarGpsController] forward = {(t1 - t0)*1000:.2f} ms")
 
         self.last_pose = (float(out[0]), float(out[1]))
+        
         return self.last_pose
 
     def get_pose(self):
+        
         return self.last_pose

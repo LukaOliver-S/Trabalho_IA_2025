@@ -9,10 +9,10 @@ class MissionController:
         self.steps = [
             ("path", "busca_principal"),
             ("rotate", 90),
-            ("forward", None),
+            ("path", "busca_lateral_esquerda1"),
             ("rotate", 90),
-            ("path", "busca_lateral_esquerda"),
-            ("rotate", 180),
+            ("path", "busca_lateral_esquerda2"),
+            # ("rotate", 180),
             # ("path", "busca_lateral_direita"),
         ]
 

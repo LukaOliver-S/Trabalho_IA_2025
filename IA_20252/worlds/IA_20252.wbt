@@ -41,8 +41,8 @@ WorldInfo {
   ]
 }
 Viewpoint {
-  orientation -0.08894934099472164 0.08283119488293496 0.9925860203986706 1.6494190647434703
-  position -3.5772819410545886 -1.475946465225174 0.30575822855704515
+  orientation 0.44675068277963487 0.7385760213073201 -0.5048953239888235 1.750502000001714
+  position -4.808678054948582 0.06476607236481306 6.6814491470652175
   follow "youBot"
 }
 TexturedBackground {
@@ -89,30 +89,61 @@ PlasticFruitBox {
   color 1 0 0
 }
 Youbot {
-  hidden position_0_0 631.774288788458
-  hidden position_0_1 -871.1566844635951
-  hidden position_0_2 446.55254700911195
-  hidden position_0_3 -722.8681993881532
-  hidden linearVelocity_0 1.0401564832886223e-07 2.3609438086340106e-09 -3.7772158170413806e-06
-  hidden angularVelocity_0 -3.744408011292786e-08 1.641014769792289e-06 8.005341940518521e-13
-  hidden position_9_0 -5.215685866838535e-09
-  hidden position_10_0 1.5700026510264835
-  hidden rotation_11 0 -0.9999999999999999 0 1.5700026510264835
-  hidden position_11_0 -2.6350013104522643
-  hidden rotation_12 0 1 0 2.6350013104522643
-  hidden position_12_0 1.7800004243485257
-  hidden rotation_13 0 -1 0 1.7800004243485257
-  hidden position_13_0 2.114542509843394e-11
-  hidden position_14_0 0.025000000011942726
-  hidden position_14_1 0.024999999964051754
-  hidden translation_15 0 0.025000000011942726 0.09
-  hidden translation_16 0 -0.024999999964051754 0.09
-  hidden rotation_17 0 -1 0 5.310371301657236
-  hidden rotation_18 0 -0.9999999999999999 0 2.680470669854949
-  hidden rotation_19 0 -1 0 6.202119434419769
-  hidden rotation_20 0 -0.9999999999999999 0 3.6941584085963233
-  translation -3.6033138034256202 0.10237760271349235 0.10193799137709142
-  rotation -0.017123161874308485 0.6957557967160277 -0.7180742779570035 0.0022833822329708935
+  hidden position_0_1 -719.1414731922519
+  hidden position_0_2 495.4183251750786
+  hidden linearVelocity_0 -1.2496281643309149e-09 -2.96819824028181e-11 1.652606590847204e-09
+  hidden angularVelocity_0 4.681415756166501e-10 -1.768282975439724e-08 4.20573376394778e-12
+  hidden position_9_0 -3.0224347922937856e-10
+  hidden translation_10 0 0 0.077
+  hidden rotation_10 0 0 1 0
+  hidden position_10_0 1.5700026343811548
+  hidden linearVelocity_10 -4.368004765285399e-09 -9.309047123113463e-11 4.797127329974369e-09
+  hidden angularVelocity_10 4.707408571742229e-10 -1.7710651463216766e-08 9.057837295956452e-10
+  hidden translation_11 0.033 0 0.07
+  hidden rotation_11 0 -1 0 1.5700026343811546
+  hidden position_11_0 -2.6350016418858617
+  hidden linearVelocity_11 -4.855777216776606e-09 -1.5667274917597067e-10 3.879752150909419e-09
+  hidden angularVelocity_11 4.720260778861137e-10 -1.7721127612561834e-08 9.066832967506003e-10
+  hidden translation_12 0 0 0.155
+  hidden rotation_12 0 1 0 2.6350016418858617
+  hidden linearVelocity_12 4.645660749964621e-08 -1.8606942760365032e-10 -9.068865683919993e-08
+  hidden angularVelocity_12 2.3981441622930324e-10 1.6410830493538161e-06 8.406291123635386e-10
+  hidden translation_13 0 0 0.135
+  hidden position_13_0 4.561808423320786e-12
+  hidden linearVelocity_13 1.3409717945507573e-07 -1.6155449157765247e-10 -1.6324819419894697e-07
+  hidden angularVelocity_13 2.397040986047655e-10 1.641076501003436e-06 8.407611871988414e-10
+  hidden translation_14 0 0 0.081
+  hidden rotation_14 0 0 1 0
+  hidden position_14_0 0.025000000011901915
+  hidden position_14_1 0.024999999988098126
+  hidden linearVelocity_14 2.5812505070485025e-07 -2.346668811421026e-10 -5.5843964777789396e-08
+  hidden angularVelocity_14 2.6967191879506733e-10 1.6410738011082415e-06 8.06133461374223e-10
+  hidden translation_15 0 0.025000000011901915 0.09
+  hidden rotation_15 1 0 0 4.71239
+  hidden linearVelocity_15 3.3874349200667636e-07 -2.8221359540640323e-10 1.3980009298345903e-08
+  hidden angularVelocity_15 2.696751657953446e-10 1.6410736030839155e-06 8.062614493060936e-10
+  hidden translation_16 0 -0.024999999988098126 0.09
+  hidden rotation_16 0 -0.7071067811865476 0.7071067811865476 3.14159
+  hidden linearVelocity_16 3.3880457642542364e-07 -2.8220195582206925e-10 1.3944942297191197e-08
+  hidden angularVelocity_16 2.69694551034733e-10 1.6410736127686672e-06 8.060011510124396e-10
+  hidden translation_17 0.228 -0.158 -0.055
+  hidden rotation_17 0 -1 0 4.210279721713645
+  hidden linearVelocity_17 -9.456091493066907e-10 9.752320433872765e-12 5.4529179002009515e-09
+  hidden angularVelocity_17 4.696934662472302e-10 -1.7684190796308223e-08 4.200653281927423e-12
+  hidden translation_18 0.228 0.158 -0.055
+  hidden rotation_18 0 -1 0 1.4617067708218061
+  hidden linearVelocity_18 -9.450356613232958e-10 -5.447020585070805e-11 5.5971063696289335e-09
+  hidden angularVelocity_18 4.665094128155387e-10 -1.7684345476339495e-08 4.200664834832175e-12
+  hidden translation_19 -0.228 -0.158 -0.055
+  hidden rotation_19 0 0.9999999999999999 0 4.964546888469387
+  hidden linearVelocity_19 -9.534813853688617e-10 -5.997784911891617e-11 -2.448062764774415e-09
+  hidden angularVelocity_19 4.663076302918676e-10 -1.7684491778195793e-08 4.200761472577506e-12
+  hidden translation_20 -0.228 0.158 -0.055
+  hidden rotation_20 0 1 0 0.02466444754149544
+  hidden linearVelocity_20 -9.539517910549325e-10 1.3063077334147722e-11 -2.3038769090817127e-09
+  hidden angularVelocity_20 4.699726845261406e-10 -1.768447495891062e-08 4.200886273576447e-12
+  translation -3.961849623881553 -0.000688337964009207 0.10193777040592815
+  rotation 0.025366685816720854 -0.9958320370318884 -0.08760756400902585 -0.0015953761663158872
   controllerArgs [
     ""
   ]
@@ -398,11 +429,12 @@ Solid {
   name "safety_zone_9"
 }
 Solid {
-  translation 0.0747649905771457 0.0256582274914241 0.016
+  translation 0.4733800641306587 -0.9638801419709104 0.01499411380260592
+  rotation -0.9911057452338895 -0.13214743269785548 0.015698974353193267 9.334885387390812e-17
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 1 0 0
+        baseColor 0 0 1
         roughness 0.8
         metalness 0
       }
@@ -420,15 +452,16 @@ Solid {
     mass 0.03
   }
   recognitionColors [
-    1 0 0
+    0 0 1
   ]
 }
 Solid {
-  translation -0.012772482814118913 0.3567798551897481 0.016
+  translation -0.7878976689682804 0.49080648258952686 0.01499411380260592
+  rotation -0.9911057452338895 -0.13214743269785548 0.015698974353193267 9.334885387390812e-17
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 1 0 0
+        baseColor 0 1 0
         roughness 0.8
         metalness 0
       }
@@ -446,15 +479,16 @@ Solid {
     mass 0.03
   }
   recognitionColors [
-    1 0 0
+    0 1 0
   ]
 }
 Solid {
-  translation 0.9744306185252212 0.8224171024515536 0.016
+  translation -2.294951798569865 -0.11568329033090885 0.014994113802605917
+  rotation -0.9709277164835308 0.20805593924647622 -0.1183726974785271 8.893625985445056e-17
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 0 0 1
+        baseColor 1 0 0
         roughness 0.8
         metalness 0
       }
@@ -472,15 +506,16 @@ Solid {
     mass 0.03
   }
   recognitionColors [
-    0 0 1
+    1 0 0
   ]
 }
 Solid {
-  translation -1.9190961539424485 -0.8423719238019218 0.016
+  translation 1.672802962123911 -0.4054429680910865 0.01499411380260592
+  rotation 0.5575836192127182 0.6691003430552515 -0.4913300708373052 5.530924402936092e-17
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 0 1 0
+        baseColor 0 0 1
         roughness 0.8
         metalness 0
       }
@@ -498,11 +533,12 @@ Solid {
     mass 0.03
   }
   recognitionColors [
-    0 1 0
+    0 0 1
   ]
 }
 Solid {
-  translation 0.705440113501286 -0.5165433533676416 0.016
+  translation -2.580490536625508 -0.003281338516666267 0.014994113991882883
+  rotation 6.957299042076216e-10 2.6273923220198457e-10 1 0.7186323770567329
   children [
     Shape {
       appearance PBRAppearance {
@@ -528,11 +564,12 @@ Solid {
   ]
 }
 Solid {
-  translation -0.4362615773917602 0.13137053013678046 0.016
+  translation 0.5561227842572394 -0.5886455935829147 0.01499411380260592
+  rotation -0.9911057452338895 -0.13214743269785548 0.015698974353193267 9.334885387390812e-17
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 0 0 1
+        baseColor 0 1 0
         roughness 0.8
         metalness 0
       }
@@ -550,15 +587,16 @@ Solid {
     mass 0.03
   }
   recognitionColors [
-    0 0 1
+    0 1 0
   ]
 }
 Solid {
-  translation 0.610212937055644 0.3486268293280126 0.016
+  translation 1.3202364933101736 0.15028911132816103 0.01499411380260592
+  rotation 0.5575836192127182 0.6691003430552515 -0.4913300708373052 5.530924402936092e-17
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 0 0 1
+        baseColor 1 0 0
         roughness 0.8
         metalness 0
       }
@@ -576,15 +614,16 @@ Solid {
     mass 0.03
   }
   recognitionColors [
-    0 0 1
+    1 0 0
   ]
 }
 Solid {
-  translation -0.1342472813176383 0.31558775340404144 0.016
+  translation -1.8107405283362312 0.3442698209297459 0.01499411380260592
+  rotation 0.5575836192127182 0.6691003430552515 -0.4913300708373052 5.530924402936092e-17
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 0 0 1
+        baseColor 0 1 0
         roughness 0.8
         metalness 0
       }
@@ -602,11 +641,12 @@ Solid {
     mass 0.03
   }
   recognitionColors [
-    0 0 1
+    0 1 0
   ]
 }
 Solid {
-  translation -0.16076455830425562 0.9255071609992342 0.016
+  translation 0.6576024978832766 -0.5343075195900011 0.01499411380260592
+  rotation -0.9911057452338895 -0.13214743269785548 0.015698974353193267 9.334885387390812e-17
   children [
     Shape {
       appearance PBRAppearance {
@@ -632,7 +672,8 @@ Solid {
   ]
 }
 Solid {
-  translation -2.902330724363712 0.07110652487908764 0.016
+  translation -2.530489795247503 -0.2993911741699553 0.014994113802605919
+  rotation 0.4616174145246409 -0.6924261217869947 0.5544866350730266 5.344603993082319e-17
   children [
     Shape {
       appearance PBRAppearance {
@@ -658,11 +699,12 @@ Solid {
   ]
 }
 Solid {
-  translation -2.820578631632533 0.020917583023040365 0.016
+  translation -0.4661611739111118 0.37377688360219485 0.01499411380260592
+  rotation -0.9911057452338895 -0.13214743269785548 0.015698974353193267 9.334885387390812e-17
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 1 0 0
+        baseColor 0 1 0
         roughness 0.8
         metalness 0
       }
@@ -680,15 +722,16 @@ Solid {
     mass 0.03
   }
   recognitionColors [
-    1 0 0
+    0 1 0
   ]
 }
 Solid {
-  translation -2.3106461756727237 0.22102562801040126 0.016
+  translation 1.4855429089418362 0.1547246630392629 0.01499411380260592
+  rotation 0.5575836192127182 0.6691003430552515 -0.4913300708373052 5.530924402936092e-17
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 0 0 1
+        baseColor 0 1 0
         roughness 0.8
         metalness 0
       }
@@ -706,15 +749,16 @@ Solid {
     mass 0.03
   }
   recognitionColors [
-    0 0 1
+    0 1 0
   ]
 }
 Solid {
-  translation -1.127667692270672 -0.0527839292634078 0.016
+  translation -0.6873169075599468 -0.33619621823097656 0.01499411380260592
+  rotation -0.9911057452338895 -0.13214743269785548 0.015698974353193267 9.334885387390812e-17
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 0 1 0
+        baseColor 0 0 1
         roughness 0.8
         metalness 0
       }
@@ -732,11 +776,12 @@ Solid {
     mass 0.03
   }
   recognitionColors [
-    0 1 0
+    0 0 1
   ]
 }
 Solid {
-  translation -1.5385439433624881 0.26194831980819666 0.016
+  translation -0.19798396438872157 -0.6185220174735522 0.01499411380260592
+  rotation -0.9911057452338895 -0.13214743269785548 0.015698974353193267 9.334885387390812e-17
   children [
     Shape {
       appearance PBRAppearance {
@@ -762,11 +807,12 @@ Solid {
   ]
 }
 Solid {
-  translation -1.684604472220845 -0.3262961082169913 0.016
+  translation -1.3227478044255097 -0.31485396684053146 0.01499411380260592
+  rotation 0.5575836192127182 0.6691003430552515 -0.4913300708373052 5.530924402936092e-17
   children [
     Shape {
       appearance PBRAppearance {
-        baseColor 1 0 0
+        baseColor 0 1 0
         roughness 0.8
         metalness 0
       }
@@ -784,11 +830,11 @@ Solid {
     mass 0.03
   }
   recognitionColors [
-    1 0 0
+    0 1 0
   ]
 }
 Solid {
-  translation 0.0747649905771457 0.0256582274914241 0.001
+  translation 0.4733800641306587 -0.9638801419709104 0.001
   children [
     Shape {
       appearance PBRAppearance {
@@ -804,7 +850,7 @@ Solid {
   name "cube_safety_0"
 }
 Solid {
-  translation -0.012772482814118913 0.3567798551897481 0.001
+  translation -0.7878976689682804 0.49080648258952686 0.001
   children [
     Shape {
       appearance PBRAppearance {
@@ -820,7 +866,7 @@ Solid {
   name "cube_safety_1"
 }
 Solid {
-  translation 0.9744306185252212 0.8224171024515536 0.001
+  translation -2.294951798569865 -0.11568329033090885 0.001
   children [
     Shape {
       appearance PBRAppearance {
@@ -836,7 +882,7 @@ Solid {
   name "cube_safety_2"
 }
 Solid {
-  translation -1.9190961539424485 -0.8423719238019218 0.001
+  translation 1.672802962123911 -0.4054429680910865 0.001
   children [
     Shape {
       appearance PBRAppearance {
@@ -852,7 +898,7 @@ Solid {
   name "cube_safety_3"
 }
 Solid {
-  translation 0.705440113501286 -0.5165433533676416 0.001
+  translation -2.5685361460317457 0.03611398480101591 0.001
   children [
     Shape {
       appearance PBRAppearance {
@@ -868,7 +914,7 @@ Solid {
   name "cube_safety_4"
 }
 Solid {
-  translation -0.4362615773917602 0.13137053013678046 0.001
+  translation 0.5561227842572394 -0.5886455935829147 0.001
   children [
     Shape {
       appearance PBRAppearance {
@@ -884,7 +930,7 @@ Solid {
   name "cube_safety_5"
 }
 Solid {
-  translation 0.610212937055644 0.3486268293280126 0.001
+  translation 1.3202364933101736 0.15028911132816103 0.001
   children [
     Shape {
       appearance PBRAppearance {
@@ -900,7 +946,7 @@ Solid {
   name "cube_safety_6"
 }
 Solid {
-  translation -0.1342472813176383 0.31558775340404144 0.001
+  translation -1.8107405283362312 0.3442698209297459 0.001
   children [
     Shape {
       appearance PBRAppearance {
@@ -916,7 +962,7 @@ Solid {
   name "cube_safety_7"
 }
 Solid {
-  translation -0.16076455830425562 0.9255071609992342 0.001
+  translation 0.6576024978832766 -0.5343075195900011 0.001
   children [
     Shape {
       appearance PBRAppearance {
@@ -932,7 +978,7 @@ Solid {
   name "cube_safety_8"
 }
 Solid {
-  translation -2.902330724363712 0.07110652487908764 0.001
+  translation -2.530489795247503 -0.2993911741699553 0.001
   children [
     Shape {
       appearance PBRAppearance {
@@ -948,7 +994,7 @@ Solid {
   name "cube_safety_9"
 }
 Solid {
-  translation -2.820578631632533 0.020917583023040365 0.001
+  translation -0.4661611739111118 0.37377688360219485 0.001
   children [
     Shape {
       appearance PBRAppearance {
@@ -964,7 +1010,7 @@ Solid {
   name "cube_safety_10"
 }
 Solid {
-  translation -2.3106461756727237 0.22102562801040126 0.001
+  translation 1.4855429089418362 0.1547246630392629 0.001
   children [
     Shape {
       appearance PBRAppearance {
@@ -980,7 +1026,7 @@ Solid {
   name "cube_safety_11"
 }
 Solid {
-  translation -1.127667692270672 -0.0527839292634078 0.001
+  translation -0.6873169075599468 -0.33619621823097656 0.001
   children [
     Shape {
       appearance PBRAppearance {
@@ -996,7 +1042,7 @@ Solid {
   name "cube_safety_12"
 }
 Solid {
-  translation -1.5385439433624881 0.26194831980819666 0.001
+  translation -0.19798396438872157 -0.6185220174735522 0.001
   children [
     Shape {
       appearance PBRAppearance {
@@ -1012,7 +1058,7 @@ Solid {
   name "cube_safety_13"
 }
 Solid {
-  translation -1.684604472220845 -0.3262961082169913 0.001
+  translation -1.3227478044255097 -0.31485396684053146 0.001
   children [
     Shape {
       appearance PBRAppearance {
