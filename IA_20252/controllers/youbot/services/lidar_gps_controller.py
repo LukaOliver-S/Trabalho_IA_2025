@@ -86,7 +86,7 @@ class LidarGpsController:
         device=None,
         debug=False,
         use_half=False,
-        predict_every=20,   # roda a rede a cada N steps
+        predict_every=15,   # roda a rede a cada N steps
         yaw_provider=None,  # callable -> returns (cos, sin) or None
         model_cls=None,     # class to instantiate (LidarPoseCNN or LidarPoseLight)
     ):
@@ -113,7 +113,23 @@ class LidarGpsController:
 
         # allow user to pick model class (compatibility/test)
         self.model_cls = model_cls or LidarPoseLight
+        
+        # ===== MÉDIA MÓVEL =====
+        self.ma_window = 3
+        self.pose_buffer = deque(maxlen=self.ma_window)
 
+    # =====================================================
+    # MÉDIA MÓVEL
+    # =====================================================
+
+    def _moving_average_pose(self, pose):
+        self.pose_buffer.append(pose)
+        arr = np.array(self.pose_buffer, dtype=np.float32)
+        mean = arr.mean(axis=0)
+        return float(mean[0]), float(mean[1])
+
+    # =====================================================
+    
     def init_after_first_step(self):
         if self.lidar is None:
             return False
@@ -232,11 +248,14 @@ class LidarGpsController:
 
         if self.debug:
             print(f"[LidarGpsController] forward = {(t1 - t0)*1000:.2f} ms")
+            
+        raw_pose = (float(out[0]), float(out[1]))
 
-        self.last_pose = (float(out[0]), float(out[1]))
-        
+        # ===== APLICA MÉDIA MÓVEL =====
+        smoothed_pose = self._moving_average_pose(raw_pose)
+
+        self.last_pose = smoothed_pose
         return self.last_pose
 
     def get_pose(self):
-        
         return self.last_pose

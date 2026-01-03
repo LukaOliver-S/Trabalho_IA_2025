@@ -98,7 +98,7 @@ class BlockHandler:
             # Abre a garra e desce pra pegar o bloco
             self.robo.gripper.release()
             self.robo.arm.set_pose(pose_id)
-            self.robo.wait(600)
+            self.robo.wait(900)
 
             # Agarrar bloco
             self.robo.gripper.grip()
@@ -117,7 +117,7 @@ class BlockHandler:
             self.robo.wait(300)
 
             # Voltar para posição segura
-            self.robo.arm.reset(self.robo.armRESET)
+            self.robo.arm.reset(self.robo.arm.RESET)
             self.robo.wait(550)
         
         # Limpa a lista da cor específica após armazenar
