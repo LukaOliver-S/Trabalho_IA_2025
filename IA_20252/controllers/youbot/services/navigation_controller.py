@@ -55,7 +55,7 @@ class NavigationController:
             "busca_lateral_esquerda1": [
                 (0.3,  0.3),
                 (-0.25, 0.3),
-                (0.4,  0.40),
+                (0.3,  0.40),
                 (-0.25, 0.5),
                 (0.4, 0.6),
                 (-0.25, 0.7),

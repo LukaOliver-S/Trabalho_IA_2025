@@ -39,11 +39,11 @@ class BlockHandler:
         # Abrir garra
         self.robo.gripper.release()
         self.robo.arm.set_height(self.robo.arm.FRONT_FLOOR)
-        self.robo.wait(1000)
+        self.robo.wait(1200)
         
         # Pegar o bloco
         self.robo.gripper.grip()
-        self.robo.wait(400)
+        self.robo.wait(600)
         # current gap approx:0.07100000000000001
         print(self.robo.gripper.check_cube_grasped())
         if self.robo.gripper.has_object():
@@ -63,7 +63,7 @@ class BlockHandler:
             
             # Soltar o bloco
             self.robo.gripper.release()
-            self.robo.wait(400)
+            self.robo.wait(600)
             
             # Registra o bloco na cor correspondente
             self.blocks_by_color[label].append(self.counter)
@@ -106,7 +106,7 @@ class BlockHandler:
 
             # Agarrar bloco
             self.robo.gripper.grip()
-            self.robo.wait(400)
+            self.robo.wait(600)
 
             # Subir
             self.robo.arm.reset(self.robo.arm.RESET2)
@@ -118,7 +118,7 @@ class BlockHandler:
 
             # Soltar bloco
             self.robo.gripper.release()
-            self.robo.wait(400)
+            self.robo.wait(600)
 
             # Voltar para posição segura
             self.robo.arm.reset(self.robo.arm.RESET)

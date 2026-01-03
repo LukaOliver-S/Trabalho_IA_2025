@@ -52,7 +52,7 @@ class Gripper:
 
         # Configura velocidade
         if self.finger:
-            self.finger.setVelocity(0.03)
+            self.finger.setVelocity(0.01)
         else:
             print("Warning: Could not find gripper motor 'finger::left'")
 
