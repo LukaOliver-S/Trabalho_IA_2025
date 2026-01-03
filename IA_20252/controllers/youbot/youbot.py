@@ -86,8 +86,8 @@ class YouBotController:
         self.CUBE_HEIGHT = 0.03
         self.DISTANCE_DIFF_THRESH = 0.01
         # ================= PICK =================
-        self.PICK_DISTANCE = 0.170
-        self.PICK_TOL = 0.005
+        self.PICK_DISTANCE = 0.169
+        self.PICK_TOL = 0.001
         self.MIN_APPROACH_SPEED = 0.03  # velocidade mínima para aproximação
         self.ALIGN_DEADZONE = 0.005     # tolerância lateral para considerar "centralizado"
         #================== GRIPPER CONTROLLER ========

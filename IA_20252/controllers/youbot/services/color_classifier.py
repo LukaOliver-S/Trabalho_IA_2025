@@ -6,7 +6,7 @@ from pathlib import Path
 class ColorClassifier:
     """Classe para classificar cores de blocos usando modelo MLP"""
     
-    def __init__(self, robo, model_path="mlp_ab_model.joblib"):
+    def __init__(self, robo, model_path="models/mlp_ab_model.joblib"):
         """
         Inicializa o classificador de cores
         

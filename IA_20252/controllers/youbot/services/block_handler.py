@@ -30,36 +30,40 @@ class BlockHandler:
         
         if self.robo.arm.current_orientation != self.robo.arm.FRONT:
             self.robo.arm.set_orientation(self.robo.arm.FRONT)
-            self.robo.wait(550)
+            self.robo.wait(700)
         
         if self.robo.arm.current_height != self.robo.arm.RESET2:
             self.robo.arm.set_height(self.robo.arm.RESET2)
-            self.robo.wait(550)
+            self.robo.wait(700)
         
         # Abrir garra
         self.robo.gripper.release()
         self.robo.arm.set_height(self.robo.arm.FRONT_FLOOR)
-        self.robo.wait(550)
+        self.robo.wait(1000)
         
         # Pegar o bloco
         self.robo.gripper.grip()
-        self.robo.wait(300)
+        self.robo.wait(400)
         # current gap approx:0.07100000000000001
         print(self.robo.gripper.check_cube_grasped())
         if self.robo.gripper.has_object():
             print("Bloco agarrado!")
             self.counter+=1
+            
+            self.robo.arm.reset(self.robo.arm.RESET)
+            self.robo.wait(600)
+            
             # Levantar
             self.robo.arm.set_orientation(self.robo.arm.FRONT)
-            self.robo.wait(550)
+            self.robo.wait(800)
             
             # Vai para a pose de armazenamento
-            self.robo.arm.set_pose(self.counter)
-            self.robo.wait(550)
+            self.robo.arm.set_pose(self.counter, "pick")
+            self.robo.wait(1300)
             
             # Soltar o bloco
             self.robo.gripper.release()
-            self.robo.wait(300)
+            self.robo.wait(400)
             
             # Registra o bloco na cor correspondente
             self.blocks_by_color[label].append(self.counter)
@@ -67,7 +71,7 @@ class BlockHandler:
         else:
             print("Bloco não pego!")
         self.robo.arm.reset(self.robo.arm.RESET2)
-        self.robo.wait(200)
+        self.robo.wait(400)
 
     def store(self, label):
         """
@@ -97,28 +101,28 @@ class BlockHandler:
             
             # Abre a garra e desce pra pegar o bloco
             self.robo.gripper.release()
-            self.robo.arm.set_pose(pose_id)
-            self.robo.wait(900)
+            self.robo.arm.set_pose(pose_id, "store")
+            self.robo.wait(1100)
 
             # Agarrar bloco
             self.robo.gripper.grip()
-            self.robo.wait(300)
+            self.robo.wait(400)
 
             # Subir
             self.robo.arm.reset(self.robo.arm.RESET2)
-            self.robo.wait(550)
+            self.robo.wait(700)
 
             # Ajustar altura para soltar na caixa
             self.robo.arm.set_height(self.robo.arm.FRONT_CARDBOARD_BOX)
-            self.robo.wait(600)
+            self.robo.wait(900)
 
             # Soltar bloco
             self.robo.gripper.release()
-            self.robo.wait(300)
+            self.robo.wait(400)
 
             # Voltar para posição segura
             self.robo.arm.reset(self.robo.arm.RESET)
-            self.robo.wait(550)
+            self.robo.wait(600)
         
         # Limpa a lista da cor específica após armazenar
         self.blocks_by_color[label].clear()

@@ -19,23 +19,42 @@ Description: Python wrapper for YouBot arm control
 from controller import Robot
 import math
 
-POSES = {
-    1: [0.385, 0.85, 0.5443,  1.78, 0.0],
-    2: [0.0, 0.85, 0.5443,  1.78, 0.0],
-    3: [-0.385, 0.85, 0.5443,  1.78, 0.0],
-    4: [0.450, 0.79, 0.679,  1.419, 0.0],
-    5: [0.150, 0.79, 0.679,  1.419, 0.0],
-    6: [-0.150, 0.79, 0.679,  1.419, 0.0],
-    7: [-0.450, 0.79, 0.679,  1.419, 0.0],
-    8: [0.390, 0.94, 0.4693,  1.284, 0.0],
-    9: [0.130, 0.94, 0.4693,  1.284, 0.0],
-    10: [-0.130, 0.94, 0.4693,  1.284, 0.0],
-    11: [-0.390, 0.94, 0.4693,  1.284, 0.0],
-    12: [0.365, 1.230, 0.019, 1.284, 0.0],
-    13: [0.1216, 1.230, 0.019, 1.284, 0.0],
-    14: [-0.1216, 1.230, 0.019, 1.284, 0.0],
-    15: [-0.365, 1.230, 0.019, 1.284, 0.0]
+PICK_POSES = {
+    1: [0.330, 0.84, 0.5443,  1.78, 0.0],
+    2: [0.0, 0.84, 0.5443,  1.78, 0.0],
+    3: [-0.330, 0.84, 0.5443,  1.78, 0.0],
+    4: [0.420, 0.780, 0.679,  1.419, 0.0],
+    5: [0.140, 0.780, 0.679,  1.419, 0.0],
+    6: [-0.140, 0.780, 0.679,  1.419, 0.0],
+    7: [-0.420, 0.780, 0.679,  1.419, 0.0],
+    8: [0.370, 0.930, 0.4693,  1.284, 0.0],
+    9: [0.120, 0.930, 0.4693,  1.284, 0.0],
+    10: [-0.120, 0.930, 0.4693,  1.284, 0.0],
+    11: [-0.370, 0.930, 0.4693,  1.284, 0.0],
+    12: [0.345, 1.220, 0.019, 1.284, 0.0],
+    13: [0.115, 1.220, 0.019, 1.284, 0.0],
+    14: [-0.115, 1.220, 0.019, 1.284, 0.0],
+    15: [-0.345, 1.220, 0.019, 1.284, 0.0]
 }
+
+STORE_POSES = {
+    1: [0.330, 0.84, 0.5443,  1.78, 0.0],
+    2: [0.0, 0.84, 0.5443,  1.78, 0.0],
+    3: [-0.330, 0.84, 0.5443,  1.78, 0.0],
+    4: [0.420, 0.795, 0.679,  1.404, 0.0],
+    5: [0.140, 0.795, 0.679,  1.404, 0.0],
+    6: [-0.140, 0.795, 0.679,  1.404, 0.0],
+    7: [-0.420, 0.795, 0.679,  1.404, 0.0],
+    8: [0.370, 0.960, 0.4693,  1.229, 0.0],
+    9: [0.120, 0.960, 0.4693,  1.229, 0.0],
+    10: [-0.120, 0.960, 0.4693,  1.229, 0.0],
+    11: [-0.370, 0.960, 0.4693,  1.229, 0.0],
+    12: [0.345, 1.275, 0.019, 1.174, 0.0],
+    13: [0.115, 1.275, 0.019, 1.174, 0.0],
+    14: [-0.115, 1.275, 0.019, 1.174, 0.0],
+    15: [-0.345, 1.275, 0.019, 1.174, 0.0]
+}
+
     
 class ArmHeight:
     """Enum-like class for arm height presets"""
@@ -110,18 +129,27 @@ class Arm:
         self.set_height(ArmHeight.RESET2)
         self.set_orientation(ArmOrientation.FRONT)
     
-    def set_pose(self, pose_id, velocity=0.3):
-        if pose_id not in POSES:
-            print(f"Pose {pose_id} não existe")
+    
+    def set_pose(self, pose_id, mode="pick", velocity=0.2):
+        if mode == "pick":
+            POSES = PICK_POSES
+        elif mode == "store":
+            POSES = STORE_POSES
+        else:
+            print(f"Modo inválido: {mode}")
             return
 
-        # define velocidade (precisão)
+        if pose_id not in POSES:
+            print(f"Pose {pose_id} não existe em {mode}")
+            return
+
         for m in self.motors:
             m.setVelocity(velocity)
 
         angles = POSES[pose_id]
         for i, angle in enumerate(angles):
             self.motors[i].setPosition(angle)
+
 
     def reset(self, reset_type=ArmHeight.RESET):
         """Reset arm to initial position"""
@@ -156,7 +184,7 @@ class Arm:
             self.motors[4].setPosition(0.0)
         elif height == ArmHeight.RESET2:
             self.motors[2].setPosition(-2.635)
-            self.wait_time(3)
+            self.wait_time(5)
             self.motors[1].setPosition(1.57)
             self.motors[3].setPosition(1.78)
             self.motors[4].setPosition(0.0)

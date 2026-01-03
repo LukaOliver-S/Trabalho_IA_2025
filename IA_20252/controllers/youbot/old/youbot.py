@@ -169,9 +169,6 @@ class YouBotController:
                                        obstacle_min_dist=self.config.obstacle_min_dist,
                                        step_wait=self._step_wait,
                                        debug=self.DEBUG)
-        self.block_handler = BlockHandler(self)
-        self.color_classifier = ColorClassifier(self, "./models/mlp_ab_model.joblib")
-        
         # ================= NAVIGATION =================
         self.navigator = NavigationController(self)
         self.mission_controller = MissionController(self.navigator, self)
