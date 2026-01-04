@@ -41,10 +41,10 @@ STORE_POSES = {
     1: [0.330, 0.84, 0.5443,  1.78, 0.0],
     2: [0.0, 0.84, 0.5443,  1.78, 0.0],
     3: [-0.330, 0.84, 0.5443,  1.78, 0.0],
-    4: [0.420, 0.795, 0.679,  1.404, 0.0],
-    5: [0.140, 0.795, 0.679,  1.404, 0.0],
-    6: [-0.140, 0.795, 0.679,  1.404, 0.0],
-    7: [-0.420, 0.795, 0.679,  1.404, 0.0],
+    4: [0.420, 0.795, 0.679,  1.384, 0.0],
+    5: [0.140, 0.795, 0.679,  1.384, 0.0],
+    6: [-0.140, 0.795, 0.679,  1.384, 0.0],
+    7: [-0.420, 0.795, 0.679,  1.384, 0.0],
     8: [0.370, 0.960, 0.4693,  1.229, 0.0],
     9: [0.120, 0.960, 0.4693,  1.229, 0.0],
     10: [-0.120, 0.960, 0.4693,  1.229, 0.0],
@@ -55,10 +55,9 @@ STORE_POSES = {
     15: [-0.345, 1.275, 0.019, 1.174, 0.0]
 }
 
-
 SWEEP_POSES = {
-    "left": [-0.775, 1.281, 1.224, -0.905, 0.000],
-    "right": [0.775, 1.281, 1.224, -0.905, 0.000]
+    "0": [-0.775, 1.281, 1.224, -0.905, 0.000],
+    "1": [0.775, 1.281, 1.224, -0.905, 0.000]
 }
     
 class ArmHeight:
@@ -135,11 +134,13 @@ class Arm:
         self.set_orientation(ArmOrientation.FRONT)
     
     
-    def set_pose(self, pose_id, mode="pick", velocity=0.2):
+    def set_pose(self, pose_id, mode="pick", velocity=0.25):
         if mode == "pick":
             POSES = PICK_POSES
         elif mode == "store":
             POSES = STORE_POSES
+        elif mode == "sweep":
+            POSES = SWEEP_POSES
         else:
             print(f"Modo inválido: {mode}")
             return
@@ -363,42 +364,3 @@ class Arm:
         self.motors[2].setPosition(gamma)
         self.motors[3].setPosition(delta)
         self.motors[4].setPosition(epsilon)
-        
-    def sweep_cubes(self, wait_callback=None, sweep_speed=0.15):
-        """
-        Realiza movimento de varredura para empurrar cubos da base traseira.
-        Move o braço da esquerda para a direita mantendo altura constante.
-        
-        Args:
-            wait_callback: função para aguardar (ex: self.robot.wait)
-            sweep_speed: velocidade do movimento de varredura
-        """
-        print("🧹 Iniciando varredura de cubos...")
-        
-        # Configurar velocidade para o movimento
-        for m in self.motors:
-            m.setVelocity(sweep_speed)
-        
-        # Ir para posição esquerda
-        left_pose = SWEEP_POSES["left"]
-        for i, angle in enumerate(left_pose):
-            self.motors[i].setPosition(angle)
-        
-        if wait_callback:
-            wait_callback(1500)  # aguarda chegar na posição
-        
-        # Varrer para a direita (MOVIMENTO PRINCIPAL)
-        print("   Varrendo esquerda → direita...")
-        right_pose = SWEEP_POSES["right"]
-        
-        # Velocidade ainda mais lenta para empurrar bem
-        self.motors[0].setVelocity(0.08)
-        self.motors[0].setPosition(right_pose[0])
-        
-        if wait_callback:
-            wait_callback(3500)  # movimento lento
-        
-        # Retornar velocidade normal
-        self.motors[0].setVelocity(0.2)
-        
-        print("✅ Varredura concluída!")

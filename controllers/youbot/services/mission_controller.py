@@ -30,7 +30,6 @@ class MissionController:
             ("store", "blue"),
             ("path", "caixa_blue_re"),
             ('rotate_to', 0),
-           
             ("path", "caixa_red"),
             ("store", "red"),
             ("path", "caixa_red_re"),
@@ -44,7 +43,7 @@ class MissionController:
         self.fallback_steps = [
             ("rotate_to",180),
             ("path", "fall_back_1"),
-            # Precisa adicionar para retirar os possiveis cubinhos do fundo
+            ("push_all_cubes", None),
             ("path", "fall_back_2"),
             ('rotate_to', 0),
             ("restart_search", None),  
@@ -146,7 +145,7 @@ class MissionController:
             self._next_step()
             return
 
-        if step_type == "push_cubes":
+        if step_type == "push_all_cubes":
             if getattr(self.robot, "DEBUG", False):
                 print("[MissionController] Empurrando cubinhos para fora")
             

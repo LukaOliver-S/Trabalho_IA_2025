@@ -40,7 +40,7 @@ class BlockHandler:
         # Abrir garra
         self.robo.gripper.release()
         self.robo.arm.set_height(self.robo.arm.FRONT_FLOOR)
-        self.robo.wait(1000)
+        self.robo.wait(600)
         
         # Pegar o bloco
         self.robo.gripper.grip()
@@ -52,19 +52,15 @@ class BlockHandler:
             self.counter+=1
             
             self.robo.arm.reset(self.robo.arm.RESET)
-            self.robo.wait(600)
-            
-            # Levantar
-            self.robo.arm.set_orientation(self.robo.arm.FRONT)
-            self.robo.wait(800)
+            self.robo.wait(400)
             
             # Vai para a pose de armazenamento
             self.robo.arm.set_pose(self.counter, "pick")
-            self.robo.wait(1300)
+            self.robo.wait(900)
             
             # Soltar o bloco
             self.robo.gripper.release()
-            self.robo.wait(400)
+            self.robo.wait(300)
             
             # Registra o bloco na cor correspondente
             self.blocks_by_color[label].append(self.counter)
@@ -94,16 +90,16 @@ class BlockHandler:
             # Garantir posição segura
             if self.robo.arm.current_height != self.robo.arm.RESET2:
                 self.robo.arm.set_height(self.robo.arm.RESET2)
-                self.robo.wait(550)
+                self.robo.wait(700)
             
             if self.robo.arm.current_orientation != self.robo.arm.FRONT:
                 self.robo.arm.set_orientation(self.robo.arm.FRONT)
-                self.robo.wait(550)
+                self.robo.wait(700)
             
             # Abre a garra e desce pra pegar o bloco
             self.robo.gripper.release()
             self.robo.arm.set_pose(pose_id, "store")
-            self.robo.wait(1100)
+            self.robo.wait(1000)
 
             # Agarrar bloco
             self.robo.gripper.grip()
@@ -115,11 +111,11 @@ class BlockHandler:
 
             # Subir
             self.robo.arm.reset(self.robo.arm.RESET2)
-            self.robo.wait(700)
+            self.robo.wait(400)
 
             # Ajustar altura para soltar na caixa
             self.robo.arm.set_height(self.robo.arm.FRONT_CARDBOARD_BOX)
-            self.robo.wait(900)
+            self.robo.wait(700)
 
             # Soltar bloco
             self.robo.gripper.release()
@@ -127,7 +123,7 @@ class BlockHandler:
 
             # Voltar para posição segura
             self.robo.arm.reset(self.robo.arm.RESET)
-            self.robo.wait(600)
+            self.robo.wait(400)
         
         # Limpa a lista da cor específica após armazenar
         self.blocks_by_color[label].clear()
@@ -135,21 +131,34 @@ class BlockHandler:
         
     def push_all_cubes(self):
         """
-        Empurra todos os cubinhos armazenados para fora do robô usando o braço.
-        Faz um movimento de varredura da esquerda para a direita.
+        Empurra todos os cubos usando sweep:
+        - vai devagar para LEFT
+        - varre rápido para RIGHT
         """
-        print("🧹 Empurrando todos os cubinhos para fora...")
-        
-        # Usar o método sweep_cubes do braço
-        self.robo.arm.sweep_cubes(wait_callback=self.robo.wait)
-        
-        # Retornar à posição segura
-        self.robo.arm.reset(self.robo.arm.RESET2)
-        self.robo.wait(600)
-        
+        print("🧹 Push all cubes com sweep poses")
+
+        arm = self.robo.arm
+
+        if self.robo.arm.current_height != self.robo.arm.RESET2:
+            self.robo.arm.set_height(self.robo.arm.RESET2)
+            self.robo.wait(700)
+
+        # === IR DEVAGAR PARA LEFT ===
+        arm.set_pose("0", mode="sweep", velocity=0.3)
+        self.robo.wait(1000)
+
+        # === VARREDURA RÁPIDA PARA RIGHT ===
+        arm.set_pose("1", mode="sweep", velocity=1.5)
+        self.robo.wait(700)
+
+        # Voltar para posição segura
+        arm.reset(arm.RESET2)
+        self.robo.wait(500)
+
         # Resetar contadores
         self.counter = 0
+        self.stored = 0
         for color in self.blocks_by_color:
             self.blocks_by_color[color].clear()
-        
-        print("✅ Cubinhos empurrados! Contadores resetados.")
+
+        print("✅ Cubos empurrados com sucesso!")
