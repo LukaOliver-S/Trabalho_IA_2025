@@ -1,0 +1,1057 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/kuka/youbot/protos/Youbot.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/factory/containers/protos/PlasticFruitBox.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/factory/containers/protos/WoodenBox.proto"
+
+WorldInfo {
+  info [
+    "Simulation of the KUKA youBot robot."
+    "This model includes an accurate and fast simulation of the Meccanum wheels."
+    "The robot can be equiped with various sensors (including the Microsoft Kinect) and configured with zero, one or two arms."
+  ]
+  title "KUKA youBot"
+  basicTimeStep 16
+  contactProperties [
+    ContactProperties {
+      material1 "InteriorWheelMat"
+      coulombFriction [
+        0, 2, 0
+      ]
+      frictionRotation -0.785398 0
+      bounce 0
+      forceDependentSlip [
+        10, 0
+      ]
+    }
+    ContactProperties {
+      material1 "ExteriorWheelMat"
+      coulombFriction [
+        0, 2, 0
+      ]
+      frictionRotation 0.785398 0
+      bounce 0
+      forceDependentSlip [
+        10, 0
+      ]
+    }
+  ]
+}
+Viewpoint {
+  orientation -0.4016668049044356 0.4057231555846101 0.8210070029301385 1.7568883616088258
+  position -1.9112464074765056 -5.233033145972179 5.903562259179391
+  follow "youBot"
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+RectangleArena {
+  translation -0.79 0 0
+  floorSize 7 4
+  floorAppearance PBRAppearance {
+    baseColorMap ImageTexture {
+      url [
+        "../textures/Material.001_baseColor.png"
+      ]
+    }
+    roughness 1
+    metalness 0
+  }
+  wallHeight 0.3
+  wallAppearance PBRAppearance {
+    baseColorMap ImageTexture {
+      url [
+        "../textures/Material.001_baseColor.png"
+      ]
+    }
+    roughness 1
+    metalness 0
+  }
+}
+PlasticFruitBox {
+  name "GREEN"
+  translation 0.48 1.58 0
+  color 0 1 0
+}
+PlasticFruitBox {
+  name "BLUE"
+  translation 0.48 -1.62 0
+  color 0 0 1
+}
+PlasticFruitBox {
+  name "RED"
+  translation 2.31 0.00999969 0
+  rotation 0 0 1 1.5708
+  color 1 0 0
+}
+Youbot {
+  hidden position_0_0 291.69091624229947
+  hidden position_0_1 185.2919959359825
+  hidden position_0_2 178.79771978267567
+  hidden position_0_3 297.8889906911414
+  hidden position_7_0 2.4617638004195696e-06
+  hidden rotation_8 0 0 1 2.46171512519518e-06
+  hidden position_8_0 0.7866863756426364
+  hidden rotation_9 0 -1 0 0.7866863756426365
+  hidden position_9_0 -2.635001963629154
+  hidden rotation_10 0 1 0 2.635001963629154
+  hidden position_10_0 1.7799999470420156
+  hidden rotation_11 0 -0.9999999999999999 0 1.7799999470420156
+  hidden position_11_0 -1.8055708766326966e-08
+  hidden position_12_0 0.024999999317638206
+  hidden position_12_1 0.024999999794488182
+  hidden translation_13 0 0.024999999317638206 0.09
+  hidden translation_14 0 -0.024999999794488182 0.09
+  hidden rotation_15 0 0.9999999999999999 0 2.5466408282207906
+  hidden rotation_16 0 -1 0 6.137575385611576
+  hidden rotation_17 0 -1 0 0.060755525785451125
+  hidden rotation_18 0 -1 0 6.242767744474987
+  translation -3.60758 1.6079 0.126684
+  rotation -0.0208030521005369 0.8237491101362594 -0.5665727107556657 0.01677932529662822
+  controllerArgs [
+    ""
+  ]
+  supervisor TRUE
+  bodySlot [
+    Compass {
+    }
+    Lidar {
+      translation 0.214166 0 -0.09
+      rotation 0 1 0 0
+      name "lidar_horizontal"
+      fieldOfView 1.5
+      numberOfLayers 1
+      maxRange 0.3
+    }
+    Lidar {
+      translation 0.214166 0 0.08
+      rotation 0 1 0 0
+      name "lidar_horizontal_2"
+      fieldOfView 1.5
+      numberOfLayers 1
+      maxRange 0.3
+    }
+    GPS {
+    }
+    Lidar {
+      translation 0.13 0.01 0.08
+      horizontalResolution 360
+      verticalFieldOfView 0.01
+      numberOfLayers 1
+      maxRange 7.5
+      type "rotating"
+    }
+    Camera {
+      translation 0.27 0 -0.085
+      rotation 1 0 0 4.692820414042842e-06
+      fieldOfView 0.15
+      width 128
+      height 128
+      far 0.13
+    }
+  ]
+}
+Robot {
+  children [
+    DEF CAM Camera {
+      translation -2.0920225412390296 0.12270166134005452 0.014994114298307241
+      rotation 7.709882115452497e-17 -1.0150252366037203e-17 1.0000000000000009 2.8797932657906427
+      name "CAM"
+      fieldOfView 0.6
+      width 256
+      height 256
+    }
+  ]
+  name "Supervisor"
+  controller "supervisor"
+  supervisor TRUE
+}
+WoodenBox {
+  translation 0.6 0 0.15
+  name "A"
+  size 0.3 0.3 0.3
+}
+WoodenBox {
+  translation 1.96 -1.24 0.15
+  name "B"
+  size 0.3 0.3 0.3
+}
+WoodenBox {
+  translation 1.95 1.25 0.15
+  name "C"
+  size 0.3 0.3 0.3
+}
+WoodenBox {
+  translation -2.28 1.5 0.15
+  name "D"
+  size 0.3 0.3 0.3
+}
+WoodenBox {
+  translation -1.02 0.75 0.15
+  name "E"
+  size 0.3 0.3 0.3
+}
+WoodenBox {
+  translation -1.02 -0.74 0.15
+  name "F"
+  size 0.3 0.3 0.3
+}
+WoodenBox {
+  translation -2.27 -1.51 0.15
+  name "G"
+  size 0.3 0.3 0.3
+}
+Solid {
+  translation -0.625 0 0.002
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0 1
+        transparency 0.6
+      }
+      geometry Box {
+        size 4.75 2 0.001
+      }
+    }
+  ]
+  name "spawn_area_marker"
+}
+Solid {
+  translation 0.48 1.58 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.6
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.43000000000000005
+      }
+    }
+  ]
+  name "safety_zone_0"
+}
+Solid {
+  translation 0.48 -1.62 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.6
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.43000000000000005
+      }
+    }
+  ]
+  name "safety_zone_1"
+}
+Solid {
+  translation 2.31 0.00999969 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.6
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.43000000000000005
+      }
+    }
+  ]
+  name "safety_zone_2"
+}
+Solid {
+  translation 0.6 0 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.6
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.3421320343559643
+      }
+    }
+  ]
+  name "safety_zone_3"
+}
+Solid {
+  translation 1.96 -1.24 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.6
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.3421320343559643
+      }
+    }
+  ]
+  name "safety_zone_4"
+}
+Solid {
+  translation 1.95 1.25 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.6
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.3421320343559643
+      }
+    }
+  ]
+  name "safety_zone_5"
+}
+Solid {
+  translation -2.28 1.5 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.6
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.3421320343559643
+      }
+    }
+  ]
+  name "safety_zone_6"
+}
+Solid {
+  translation -1.02 0.75 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.6
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.3421320343559643
+      }
+    }
+  ]
+  name "safety_zone_7"
+}
+Solid {
+  translation -1.02 -0.74 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.6
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.3421320343559643
+      }
+    }
+  ]
+  name "safety_zone_8"
+}
+Solid {
+  translation -2.27 -1.51 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.6
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.3421320343559643
+      }
+    }
+  ]
+  name "safety_zone_9"
+}
+Solid {
+  translation -2.112569674192445 -0.659344473222895 0.014994114000900892
+  rotation -0.6484431693697483 0.3508848017669099 0.6755748011780133 6.140319435359475e-17
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0 1
+        roughness 0.8
+        metalness 0
+      }
+      geometry Box {
+        size 0.03 0.03 0.03
+      }
+    }
+  ]
+  name "cube_0"
+  boundingObject Box {
+    size 0.03 0.03 0.03
+  }
+  physics Physics {
+    density -1
+    mass 0.03
+  }
+  recognitionColors [
+    0 0 1
+  ]
+  linearVelocity 2.7525090970817873e-17 -8.479706733677056e-18 -1.407848652372537e-11
+  angularVelocity 3.8549410577262273e-16 3.0839528461809924e-15 5.042243410153367e-17
+}
+Solid {
+  translation -1.7856949279552257 0.8146554871691207 0.014994114000900892
+  rotation 0.13800867176794832 -0.08048132430833493 -0.9871556933708194 3.058630615556733e-16
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 1 0
+        roughness 0.8
+        metalness 0
+      }
+      geometry Box {
+        size 0.03 0.03 0.03
+      }
+    }
+  ]
+  name "cube_1"
+  boundingObject Box {
+    size 0.03 0.03 0.03
+  }
+  physics Physics {
+    density -1
+    mass 0.03
+  }
+  recognitionColors [
+    0 1 0
+  ]
+  linearVelocity 9.860114631166478e-18 -6.125785965017424e-17 -1.4078456917008978e-11
+  angularVelocity 3.4694469519536146e-15 1.5419764230904952e-15 -3.355863309589044e-16
+}
+Solid {
+  translation -0.44974080566694896 -0.5111963840936808 0.014994114000900892
+  rotation -0.11746997986169992 0.4964164462355951 0.8600997126718009 2.1366236376103431e-16
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        roughness 0.8
+        metalness 0
+      }
+      geometry Box {
+        size 0.03 0.03 0.03
+      }
+    }
+  ]
+  name "cube_2"
+  boundingObject Box {
+    size 0.03 0.03 0.03
+  }
+  physics Physics {
+    density -1
+    mass 0.03
+  }
+  recognitionColors [
+    1 0 0
+  ]
+  linearVelocity 7.092574687884514e-17 -1.6705448973427553e-17 -1.407848652275752e-11
+  angularVelocity 4.930380657631324e-31 5.3969174808167335e-15 2.3312837900330827e-16
+}
+Solid {
+  translation -2.9340377998867755 0.550237950097378 0.014994114000900893
+  rotation 0.6719002720647435 -0.5483266909519705 -0.49788338432707924 7.941865409174304e-17
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 1 0
+        roughness 0.8
+        metalness 0
+      }
+      geometry Box {
+        size 0.03 0.03 0.03
+      }
+    }
+  ]
+  name "cube_3"
+  boundingObject Box {
+    size 0.03 0.03 0.03
+  }
+  physics Physics {
+    density -1
+    mass 0.03
+  }
+  recognitionColors [
+    0 1 0
+  ]
+  linearVelocity 8.622221752570753e-18 -1.6680213947679686e-17 -1.407851613588574e-11
+  angularVelocity 1.9274705288631193e-15 1.156482317317872e-15 -1.364687223061555e-16
+}
+Solid {
+  translation 0.7324454669418814 0.5558224554587889 0.014994114000900892
+  rotation -0.06703504837254103 0.05358846174385393 0.9963104832619291 6.230215989877449e-16
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0 1
+        roughness 0.8
+        metalness 0
+      }
+      geometry Box {
+        size 0.03 0.03 0.03
+      }
+    }
+  ]
+  name "cube_4"
+  boundingObject Box {
+    size 0.03 0.03 0.03
+  }
+  physics Physics {
+    density -1
+    mass 0.03
+  }
+  recognitionColors [
+    0 0 1
+  ]
+  linearVelocity -4.709773146984675e-17 1.9683980627545452e-17 -1.4078486523762031e-11
+  angularVelocity -1.5419764230904939e-15 -2.312964634635742e-15 -8.843989392540984e-17
+}
+Solid {
+  translation 0.2549771335533073 0.4485462927379289 0.014994114000900893
+  rotation -0.1468156500083364 -0.08634186411096866 -0.9853883738985723 5.061042442918644e-16
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 1 0
+        roughness 0.8
+        metalness 0
+      }
+      geometry Box {
+        size 0.03 0.03 0.03
+      }
+    }
+  ]
+  name "cube_5"
+  boundingObject Box {
+    size 0.03 0.03 0.03
+  }
+  physics Physics {
+    density -1
+    mass 0.03
+  }
+  recognitionColors [
+    0 1 0
+  ]
+  linearVelocity 5.234324614220391e-18 5.178394939004679e-17 -1.4078516129945768e-11
+  angularVelocity -3.469446951953615e-15 -3.85494105772624e-16 2.1005427928804657e-16
+}
+Solid {
+  translation -0.5162906593390537 -0.39863619769498215 0.014994114000900892
+  rotation 0.04693914723523988 0.3570717873047271 0.9328968084240808 2.734338927027294e-16
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 1 0
+        roughness 0.8
+        metalness 0
+      }
+      geometry Box {
+        size 0.03 0.03 0.03
+      }
+    }
+  ]
+  name "cube_6"
+  boundingObject Box {
+    size 0.03 0.03 0.03
+  }
+  physics Physics {
+    density -1
+    mass 0.03
+  }
+  recognitionColors [
+    0 1 0
+  ]
+  linearVelocity -1.0872804130169074e-17 -3.055199333358003e-17 -1.4078486522727577e-11
+  angularVelocity 1.5419764230904952e-15 -1.1564823173178715e-15 2.4109001842154863e-16
+}
+Solid {
+  translation -0.697743328805184 0.31764109742561164 0.014994114000900892
+  rotation -0.6874453023079732 0.3905036371730757 0.6123119022926944 3.9973218457600865e-17
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        roughness 0.8
+        metalness 0
+      }
+      geometry Box {
+        size 0.03 0.03 0.03
+      }
+    }
+  ]
+  name "cube_7"
+  boundingObject Box {
+    size 0.03 0.03 0.03
+  }
+  physics Physics {
+    density -1
+    mass 0.03
+  }
+  recognitionColors [
+    1 0 0
+  ]
+  linearVelocity 2.138563700776665e-17 -1.1761467424192279e-17 -1.4078456923048516e-11
+  angularVelocity 1.9274705288631186e-15 1.927470528863119e-15 2.0809717037596582e-16
+}
+Solid {
+  translation -1.2702618042035656 0.17882660960421992 0.014994114000900893
+  rotation -0.08273944373806641 0.01762975599362684 0.9964152629067464 7.613688077223431e-16
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0 1
+        roughness 0.8
+        metalness 0
+      }
+      geometry Box {
+        size 0.03 0.03 0.03
+      }
+    }
+  ]
+  name "cube_8"
+  boundingObject Box {
+    size 0.03 0.03 0.03
+  }
+  physics Physics {
+    density -1
+    mass 0.03
+  }
+  recognitionColors [
+    0 0 1
+  ]
+  linearVelocity 5.693299964545516e-18 5.4736774448798016e-17 -1.4078516134579361e-11
+  angularVelocity -5.782411586589359e-15 1.15648231731787e-15 -4.559768826751363e-16
+}
+Solid {
+  translation -2.8897246915854042 0.2405351556863875 0.014994114000900892
+  rotation -0.4397394488938867 0.06984928217799849 -0.8954051009826329 7.98642006552594e-17
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 1 0
+        roughness 0.8
+        metalness 0
+      }
+      geometry Box {
+        size 0.03 0.03 0.03
+      }
+    }
+  ]
+  name "cube_9"
+  boundingObject Box {
+    size 0.03 0.03 0.03
+  }
+  physics Physics {
+    density -1
+    mass 0.03
+  }
+  recognitionColors [
+    0 1 0
+  ]
+  linearVelocity -7.078198236323148e-18 5.651433813396692e-18 -1.4078456916496131e-11
+  angularVelocity -7.709882115452486e-16 3.854941057726239e-16 1.6752582364992498e-16
+}
+Solid {
+  translation 0.14724120199207658 -0.6895729334978331 0.014994114000900893
+  rotation -0.059248281505875834 0.03201372422007693 -0.9977298044060632 5.748221850199037e-16
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 1 0
+        roughness 0.8
+        metalness 0
+      }
+      geometry Box {
+        size 0.03 0.03 0.03
+      }
+    }
+  ]
+  name "cube_10"
+  boundingObject Box {
+    size 0.03 0.03 0.03
+  }
+  physics Physics {
+    density -1
+    mass 0.03
+  }
+  recognitionColors [
+    0 1 0
+  ]
+  linearVelocity 1.4989328769233897e-17 -1.7118977499555286e-17 -1.4078486528593994e-11
+  angularVelocity 1.92747052886312e-15 2.312964634635744e-15 1.1575888184595827e-16
+}
+Solid {
+  translation 1.6289238009566702 -0.6354219590941752 0.014994114000900893
+  rotation 0.07830124028550176 -0.075217392324694 0.9940881548744183 3.640473549173381e-16
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0 1
+        roughness 0.8
+        metalness 0
+      }
+      geometry Box {
+        size 0.03 0.03 0.03
+      }
+    }
+  ]
+  name "cube_11"
+  boundingObject Box {
+    size 0.03 0.03 0.03
+  }
+  physics Physics {
+    density -1
+    mass 0.03
+  }
+  recognitionColors [
+    0 0 1
+  ]
+  linearVelocity -6.111820359026415e-18 -4.2552339962375655e-18 -1.4078516129884054e-11
+  angularVelocity 1.1564823173178731e-15 -3.854941057726236e-16 -2.5903862203985375e-18
+}
+Solid {
+  translation 1.0817142880794286 -0.17924988526073427 0.014994114000900893
+  rotation 0.28769986392547664 -0.15648674018584818 0.9448495586299805 3.3491876991377183e-16
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0 1
+        roughness 0.8
+        metalness 0
+      }
+      geometry Box {
+        size 0.03 0.03 0.03
+      }
+    }
+  ]
+  name "cube_12"
+  boundingObject Box {
+    size 0.03 0.03 0.03
+  }
+  physics Physics {
+    density -1
+    mass 0.03
+  }
+  recognitionColors [
+    0 0 1
+  ]
+  linearVelocity 6.999032992840519e-18 -1.5413691843365237e-17 -1.4078516129054098e-11
+  angularVelocity 1.927470528863119e-15 1.1564823173178715e-15 1.8061214099961436e-16
+}
+Solid {
+  translation -1.6826039659463483 -0.5741078562944844 0.014994114000900892
+  rotation 0.05897169997963177 -0.14896970685484107 0.9870817418233886 3.590115087552009e-16
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        roughness 0.8
+        metalness 0
+      }
+      geometry Box {
+        size 0.03 0.03 0.03
+      }
+    }
+  ]
+  name "cube_13"
+  boundingObject Box {
+    size 0.03 0.03 0.03
+  }
+  physics Physics {
+    density -1
+    mass 0.03
+  }
+  recognitionColors [
+    1 0 0
+  ]
+  linearVelocity -1.0691976871589747e-17 2.830045278422028e-17 -1.4078486523123099e-11
+  angularVelocity -1.1564823173178731e-15 -3.854941057726239e-16 1.8204966874994846e-17
+}
+Solid {
+  translation -2.1354892034220376 0.134348518369668 0.014994114
+  rotation 0.019206009074365458 -0.013177326939597575 -0.9997287068350905 2.2792384260288523e-15
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 1 0
+        roughness 0.8
+        metalness 0
+      }
+      geometry Box {
+        size 0.03 0.03 0.03
+      }
+    }
+  ]
+  name "cube_14"
+  boundingObject Box {
+    size 0.03 0.03 0.03
+  }
+  physics Physics {
+    density -1
+    mass 0.03
+  }
+  recognitionColors [
+    0 1 0
+  ]
+  linearVelocity -1.5117578338153315e-17 2.7451486745821184e-17 2.9608301925549146e-17
+  angularVelocity -1.0812659842989577e-15 -6.706941090991449e-16 1.1041464945509421e-16
+}
+Solid {
+  translation -2.112569674192445 -0.659344473222895 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.4
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.0375
+      }
+    }
+  ]
+  name "cube_safety_0"
+}
+Solid {
+  translation -1.7856949279552257 0.8146554871691207 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.4
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.0375
+      }
+    }
+  ]
+  name "cube_safety_1"
+}
+Solid {
+  translation -0.44974080566694896 -0.5111963840936808 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.4
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.0375
+      }
+    }
+  ]
+  name "cube_safety_2"
+}
+Solid {
+  translation -2.9340377998867755 0.550237950097378 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.4
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.0375
+      }
+    }
+  ]
+  name "cube_safety_3"
+}
+Solid {
+  translation 0.7324454669418814 0.5558224554587889 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.4
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.0375
+      }
+    }
+  ]
+  name "cube_safety_4"
+}
+Solid {
+  translation 0.2549771335533073 0.4485462927379289 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.4
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.0375
+      }
+    }
+  ]
+  name "cube_safety_5"
+}
+Solid {
+  translation -0.5162906593390537 -0.39863619769498215 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.4
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.0375
+      }
+    }
+  ]
+  name "cube_safety_6"
+}
+Solid {
+  translation -0.697743328805184 0.31764109742561164 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.4
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.0375
+      }
+    }
+  ]
+  name "cube_safety_7"
+}
+Solid {
+  translation -1.2702618042035656 0.17882660960421992 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.4
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.0375
+      }
+    }
+  ]
+  name "cube_safety_8"
+}
+Solid {
+  translation -2.8897246915854042 0.2405351556863875 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.4
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.0375
+      }
+    }
+  ]
+  name "cube_safety_9"
+}
+Solid {
+  translation 0.14724120199207658 -0.6895729334978331 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.4
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.0375
+      }
+    }
+  ]
+  name "cube_safety_10"
+}
+Solid {
+  translation 1.6289238009566702 -0.6354219590941752 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.4
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.0375
+      }
+    }
+  ]
+  name "cube_safety_11"
+}
+Solid {
+  translation 1.0817142880794286 -0.17924988526073427 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.4
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.0375
+      }
+    }
+  ]
+  name "cube_safety_12"
+}
+Solid {
+  translation -1.6826039659463483 -0.5741078562944844 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.4
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.0375
+      }
+    }
+  ]
+  name "cube_safety_13"
+}
+Solid {
+  translation -2.1354892034220376 0.134348518369668 0.001
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0 0
+        transparency 0.4
+      }
+      geometry Cylinder {
+        height 0.001
+        radius 0.0375
+      }
+    }
+  ]
+  name "cube_safety_14"
+}

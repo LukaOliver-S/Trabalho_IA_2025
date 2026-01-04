@@ -1,0 +1,586 @@
+import math
+from controller import Robot, Keyboard
+from base import Base
+from arm import Arm
+from gripper import Gripper
+import numpy as np
+from pathlib import Path
+
+import sys
+from services import (
+    BlockHandler,
+    SensorSuite,
+    MovementController,
+    NavigationController,
+    MissionController,
+    AngleController,
+    ObstacleAvoider,
+    AlignmentController,
+    ObjectDetector,
+    LidarGpsController,
+    ColorClassifier,
+    FuzzySimple
+)
+
+class YouBotController:
+    def __init__(self):
+        self.robot = Robot()
+        self.time_step = int(self.robot.getBasicTimeStep())
+        self.dt = self.time_step / 1000.0
+        self.DEBUG = False
+        # ================= COMPONENTES =================
+        self.base = Base(self.robot)
+        self.arm = Arm(self.robot)
+        self.gripper = Gripper(self.robot)
+        self.camera = self.robot.getDevice("camera")
+        self.camera.enable(self.time_step)
+
+        # ================= KEYBOARD =================
+        self.keyboard = self.robot.getKeyboard()
+        self.keyboard.enable(self.time_step)
+
+        # ================= LiDARs =================
+        self.lidar_low = self.robot.getDevice("lidar_horizontal")
+        self.lidar_high = self.robot.getDevice("lidar_horizontal_2")
+        self.lidar_global = self.robot.getDevice("lidar")
+        if self.lidar_low is None or self.lidar_high is None or self.lidar_global is None:
+            print("❌ ERRO: LiDARs não encontrados", file=sys.stderr)
+            sys.exit(1)
+
+        self.lidar_low.enable(self.time_step)
+        self.lidar_high.enable(self.time_step)
+        self.lidar_global.enable(self.time_step)   
+        self.lidar_global.enablePointCloud()  # ← ativa visualização        # ================= LIDAR_GPS ===============
+
+        self.lidar_gps = LidarGpsController(
+            self.lidar_global,
+            model_path=Path("./models/lidar_gps_yaw_4.pth"),
+            T=3,
+            max_range=5.5,
+            debug=self.DEBUG,
+            yaw_provider=self._compass_yaw_vector,  # <--- provider conectado à bússola
+        )
+
+        self.lidar_pose = None
+        # ================= COMPASS =================
+        self.compass = self.robot.getDevice("compass")
+        self.compass.enable(self.time_step)
+        # ==================SENSORS====================
+        self.sensors = SensorSuite(self.lidar_low, self.lidar_high, self.compass, step_wait=self._step_wait)
+        # ================= MOVIMENTO =================
+        self.movement = MovementController(self.base, step_wait=self._step_wait)
+        self.forward_speed = 0.09
+        self.strafe_speed = 0.09
+        self.movement_duration = 10
+        self.move_forward_counter = 0
+        self.move_backward_counter = 0
+        self.strafe_left_counter = 0
+        self.strafe_right_counter = 0
+        # ================= angulação =================
+        self.angle_controller = AngleController(self.compass, self.base, self.dt) # Por algum motivo não funciona
+        
+        
+        # fuzzy velocity selector 
+        self.fuzzy = FuzzySimple(v_max=0.07)
+        # ================= PARÂMETROS =================
+        self.CUBE_HEIGHT = 0.03
+        self.DISTANCE_DIFF_THRESH = 0.01
+        # ================= PICK =================
+        self.PICK_DISTANCE = 0.169
+        self.PICK_TOL = 0.001
+        self.MIN_APPROACH_SPEED = 0.03  # velocidade mínima para aproximação
+        self.ALIGN_DEADZONE = 0.005     # tolerância lateral para considerar "centralizado"
+        #================== GRIPPER CONTROLLER ========
+        self.gripper_descended = False
+        self.is_picking = False   
+        self.initial_angle = 0.0
+        self.rotating = False
+        self.rotation_started = False      
+        self.rotation_direction = 0      
+        self.target_angle = None
+        self.Cube_min_dist = 0.25
+        self.failed_alignment_attempts = 0  # ← ADICIONAR ESTA LINHA
+        self.max_alignment_attempts = 2     # ← ADICIONAR ESTA LINHA
+        #================= Align Controller ==========
+        self.max_align_ticks = 6500
+        self.aligner = AlignmentController(
+            self.base, self.sensors,
+            kp=0.1, max_vy=0.09, deadzone=self.ALIGN_DEADZONE,
+            forward_speed=self.forward_speed,
+            pick_distance=self.PICK_DISTANCE,
+            pick_tol=self.PICK_TOL,
+            min_approach_speed=self.MIN_APPROACH_SPEED,
+            debug=self.DEBUG,
+            fuzzy=self.fuzzy,
+            max_align_ticks= self.max_align_ticks, 
+            max_capacity=15,
+        )
+   
+    # ================= AVOID ====================
+        self.OBSTACLE_MIN_DIST = 0.30   # espaço mínimo atrás do cubo para considerar "acessível"
+        self.obstacle_detected = False
+        self.obstacle_blocking_cube = False
+        self.avoiding = False
+        self.avoider = ObstacleAvoider(self.base, self.lidar_low, self.lidar_high, self.sensors, step_wait=self._step_wait, dt=self.dt, debug=self.DEBUG,    obstacle_min_dist=self.OBSTACLE_MIN_DIST,  # <= pass min-dist
+)
+
+     # ================== OBJECT DETECTOR==========
+        self.detector = ObjectDetector(self.sensors,
+                               distance_diff_thresh=self.DISTANCE_DIFF_THRESH,
+                               obstacle_min_dist=self.OBSTACLE_MIN_DIST,
+                               step_wait=self._step_wait,
+                               debug=self.DEBUG)
+    
+        # ================= BLOCK HANDLER & COLOR CLASSIFIER ==========
+        self.block_handler = BlockHandler(self)
+        self.color_classifier = ColorClassifier(self, "./models/mlp_ab_model.joblib")
+        
+        # ================= NAVIGATION =================
+        self.navigator = NavigationController(
+            self,
+        )
+        self.mission_controller = MissionController(self.navigator, self)
+        
+    # ================= KEYBOARD =================
+    def handle_keyboard_input(self):
+        key = self.keyboard.getKey()
+        while key >= 0:
+            if key in (ord('W'), ord('w')):
+                self.movement.forward()
+            elif key in (ord('S'), ord('s')):
+                self.movement.backward()
+            elif key in (ord('A'), ord('a')):
+                self.movement.strafe_left()
+            elif key in (ord('D'), ord('d')):
+                self.movement.strafe_right()
+            elif key == ord(' '):
+                self.movement.stop_all()
+            elif key in (ord('Q'), ord('q')):
+                return False
+            elif key == ord('J'):  # Gira 90° à esquerda
+                self.rotate_right_90()
+            elif key == ord('L'):  # Gira 90° à direita
+                self.rotate_left_90()
+            elif key == ord('K'):  # Volta à posição original
+                self.rotate_to_initial()
+            elif key in (ord('V'), ord('v')):
+                self.block_handler.store("red")
+            key = self.keyboard.getKey()
+        return True
+
+    def wait(self, steps=30):
+        for _ in range(steps):
+            self.robot.step(self.time_step)
+            
+    # ================= MOVIMENTO =================
+    def update_movement(self):
+        # proxy picking/block state into movement controller and delegate
+        self.movement.is_picking = getattr(self, "picker", None) and self.picker.is_picking
+        self.movement.block_forward = getattr(self, "block_forward", False)
+        self.movement.update()
+
+    # ================= LIDAR READ =================
+    def read_lidars(self):
+        return self.sensors.read_lidars()
+    # ================= COMPASS / ROTAÇÃO =================
+    def get_current_angle(self):
+        north = self.compass.getValues()
+        angle_rad = math.atan2(north[0], north[1])
+        angle_deg = math.degrees(angle_rad)
+        if angle_deg < 0:
+            angle_deg += 360
+        return angle_deg
+
+    def angle_diff(self, target, current):
+        """Diferença mínima entre dois ângulos (±180°)."""
+        d = (target - current + 180) % 360 - 180
+        return d
+
+    def start_rotation(self, target_angle):
+        """Inicia a rotação não-bloqueante."""
+        self.target_angle = target_angle % 360
+        self.rotating = True
+
+
+    def rotate_to_initial(self):
+        """Gira até o ângulo inicial definido."""
+        if self.rotating:
+            return
+        self.rotate_to_angle(self.initial_angle)
+
+    def rotate_to_angle(self, target_angle):
+        """Inicia a rotação em direção a target_angle (não-bloqueante)."""
+        self.target_angle = target_angle % 360
+        self.rotating = True
+        self.rotation_started = False  # reinicia a inicialização da direção
+
+    def rotate_left_90(self):
+        """Gira 90° para a esquerda a partir do ângulo atual."""
+        if self.rotating:
+            return
+        current = self.get_current_angle()
+        self.rotate_to_angle((current - 90) % 360)
+
+    def rotate_right_90(self):
+        """Gira 90° para a direita a partir do ângulo atual."""
+        if self.rotating:
+            return
+        current = self.get_current_angle()
+        self.rotate_to_angle((current + 90) % 360)
+
+    def update_rotation(self):
+        if not self.rotating:
+            return False  # <<< NÃO está girando
+
+        current_angle = self.get_current_angle()
+        diff = self.angle_diff(self.target_angle, current_angle)
+
+        deadzone = 0.2
+        max_speed = 0.09
+        min_speed = 0.02  # velocidade mínima para evitar paradas bruscas
+        slow_zone = 30.0  # zona de desaceleração maior
+
+        # Inicializa a direção apenas no início
+        if not self.rotation_started:
+            if diff == 0:
+                self.rotation_direction = 0
+            else:
+                self.rotation_direction = -1 if diff > 0 else 1
+            self.rotation_started = True
+
+        # Se dentro do deadzone, parar de girar
+        if abs(diff) <= deadzone:
+            self.base.move(0, 0, 0)
+            self.rotating = False
+            self.rotation_started = False
+            return False  # <<< terminou de girar
+
+        # Velocidade proporcional suave usando função quadrática
+        if abs(diff) >= slow_zone:
+            # Fora da slow_zone: velocidade máxima
+            speed = max_speed
+        else:
+            # Dentro da slow_zone: desaceleração suave (quadrática)
+            ratio = abs(diff) / slow_zone  # 0.0 a 1.0
+            # Curva quadrática para transição mais suave
+            speed = min_speed + (max_speed - min_speed) * (ratio ** 2)
+        
+        # Garante que a velocidade não seja menor que min_speed
+        speed = max(speed, min_speed)
+
+        # Gira na direção correta
+        self.base.move(0, 0, speed * self.rotation_direction)
+
+        return True  # <<< ESTÁ girando
+
+        
+    def _compass_yaw_vector(self):
+        """
+        Retorna (cos, sin) a partir da bússola.
+        Usa as duas primeiras componentes (x,y) do vetor norte da bússola.
+        """
+        north = self.compass.getValues()
+        x, y = float(north[0]), float(north[1])
+        norm = math.hypot(x, y)
+        if norm == 0 or not np.isfinite(norm):
+            return (1.0, 0.0)  # fallback yaw=0
+        cos_yaw = y / norm
+        sin_yaw = x / norm
+        return (cos_yaw, sin_yaw)
+
+    # ================= DETECT (INTACTA) =================
+    def detect_objects(self):
+        # Reset flags (mantém comportamento anterior)
+        if not self.is_picking:
+            if self.gripper_descended:
+                if self.DEBUG: print("resetando gripper_descended")
+            self.gripper_descended = False
+            if hasattr(self, "picker"):
+                self.picker.gripper_descended = False
+
+        self.cube_detected_a_frente = False
+        self.obstacle_detected = False
+        self.obstacle_blocking_cube = False
+
+        res = self.detector.detect()
+        if not res:
+            return
+
+        self.cube_detected_a_frente = bool(res["cube_detected_a_frente"])
+        self.obstacle_detected = bool(res["obstacle_detected"])
+        self.obstacle_blocking_cube = bool(res["obstacle_blocking_cube"])
+
+    # ================= AVOID OBJECT ================================
+    def avoid_obstacle(self):
+            self.move_forward_counter = 0
+            self.move_backward_counter = 0
+            self.block_forward = True
+            self.base.move(0, 0, 0)
+            self._step_wait(0.03)
+            freed = self.avoider.start_avoid()
+            if freed:
+                self.obstacle_detected = False
+            # copia estados úteis do avoider para o controlador (opcional)
+            self.avoid_cooldown = self.avoider.avoid_cooldown
+            self.avoid_attempts = self.avoider.avoid_attempts
+            self.last_avoid_side = self.avoider.last_avoid_side
+            self.recently_freed = self.avoider.recently_freed
+            self.block_forward = False
+            
+    # ================= DESCEND GRIPPER (REESCRITA) =================
+    def descend_gripper_if_target_distance(self):
+        if self.is_picking or not self.cube_detected_a_frente:
+            self.gripper_descended = False
+            return
+
+        min_low, _ = self.read_lidars()
+        if not np.isfinite(min_low):
+            self.gripper_descended = False
+            return
+
+        if abs(min_low - self.PICK_DISTANCE) <= self.PICK_TOL:
+            self.is_picking = True
+            try:
+                self.picker.do_pick_blocking()
+                self.gripper_descended = True
+            finally:
+                self.is_picking = False
+        else:
+            self.gripper_descended = False
+            
+   
+    # ================= UTILS =================
+    def _step_wait(self, seconds):
+        steps = max(1, int(seconds / self.dt))
+        for _ in range(steps):
+            if self.robot.step(self.time_step) == -1:
+                break
+            
+
+
+
+    def run(self):
+        print("=== YouBot | Missões com Coleta e Retorno ===")
+
+        # ===== STEP INICIAL =====
+        self.robot.step(self.time_step)
+        self.lidar_gps.init_after_first_step()
+
+        # ===== ESTADOS =====
+        navigating = True
+        collecting_cube = False
+        returning = False
+
+        saved_pose = None
+        saved_mission_step = None
+        saved_nav_state = None
+
+        # ===== INICIA MISSÃO =====
+        self.mission_controller.start()
+
+        # ===== LOOP PRINCIPAL =====
+        while self.robot.step(self.time_step) != -1:
+            
+            # ===== POSE =====
+            pose = self.lidar_gps.step()
+            if pose is not None:
+                self.lidar_pose = pose
+                if  self.DEBUG:
+                    print(f"📍 Pose: x={pose[0]:.2f}, y={pose[1]:.2f}")
+
+            # ===== TECLADO =====
+            if not self.handle_keyboard_input():
+                break
+
+            # =====================================================
+            # 🔄 CONTROLE DE ROTAÇÃO
+            # =====================================================
+            is_rotating = self.update_rotation()  # <-- deve retornar True/False
+
+            # =====================================================
+            # 👁️ PERCEPÇÃO (somente se NÃO estiver rotacionando)
+            # =====================================================
+            if not is_rotating:
+                self.detect_objects()
+            else:
+                self.cube_detected_a_frente = False  # segurança extra
+
+     
+            if navigating and self.cube_detected_a_frente and not is_rotating:
+                
+                # ===== VERIFICA CAPACIDADE ANTES DE INTERROMPER =====
+                if self.block_handler.counter >= 15:  # max_capacity
+                    if self.DEBUG:
+                        print(f"Base cheia ({self.block_handler.counter}/15) — ignorando cubo detectado")
+                    # Não pausa a missão, continua navegando
+                    continue
+                
+                navigating = False
+                collecting_cube = True
+
+                # salva pose exata
+                saved_pose = self.lidar_pose
+                if saved_pose is None:
+                    if self.DEBUG:
+                        print("Pose ainda indisponível — aguardando...")
+                    for _ in range(50):
+                        if self.robot.step(self.time_step) == -1:
+                            break
+                        pose = self.lidar_gps.step()
+                        if pose is not None:
+                            self.lidar_pose = pose
+                            saved_pose = pose
+                            break
+
+                # salva estado da missão
+                saved_mission_step = self.mission_controller.current_step
+                saved_nav_state = self.navigator.save_state()
+
+                # pausa missão
+                self.mission_controller.active = False
+                self.navigator.stop()
+
+                if self.DEBUG:
+                    print("Cubo detectado — missão pausada")
+                continue
+
+            # =====================================================
+            # 🧊 COLETA DO CUBO
+            # =====================================================
+            if collecting_cube:
+                # ===== VERIFICA TIMEOUT DE ALINHAMENTO =====
+                if self.aligner.alignment_failed:
+                    self.failed_alignment_attempts += 1  # ← ADICIONAR: incrementa tentativas
+                    
+                    # ← ADICIONAR: verifica se excedeu limite
+                    if self.failed_alignment_attempts >= self.max_alignment_attempts:
+                        if self.DEBUG:
+                            print(f"⛔ Desistindo do cubo após {self.failed_alignment_attempts} tentativas falhadas")
+                        
+                        collecting_cube = False
+                        navigating = True
+                        self.failed_alignment_attempts = 0  # ← reset contador
+                        
+                        # Restaura missão
+                        self.mission_controller.current_step = saved_mission_step
+                        if saved_nav_state:
+                            self.navigator.restore_state(saved_nav_state)
+                        self.mission_controller.active = True
+                        
+                        self.aligner.align_ticks = 0
+                        self.aligner.alignment_failed = False
+                        continue
+                    
+                    # ← ADICIONAR: se não excedeu, tenta novamente
+                    collecting_cube = False
+                    navigating = True
+
+                    # Restaura missão
+                    self.mission_controller.current_step = saved_mission_step
+                    if saved_nav_state:
+                        self.navigator.restore_state(saved_nav_state)
+                    self.mission_controller.active = True
+
+                    # Reset do aligner para próxima tentativa
+                    self.aligner.align_ticks = 0
+                    self.aligner.alignment_failed = False
+
+                    if self.DEBUG:
+                        print(f"⛔ Falha no alinhamento (tentativa {self.failed_alignment_attempts}/{self.max_alignment_attempts}) — retentando")
+                    continue
+
+                # ===== TENTATIVA DE ALINHAMENTO =====
+                aligned = self.aligner.align_with_cube()
+
+                if aligned:
+                    reached = self.aligner.auto_approach_cube()
+
+                    if reached:
+                        # ===== VERIFICA CAPACIDADE ANTES DE PEGAR =====
+                        if self.block_handler.counter >= 15:  # max_capacity
+                            if self.DEBUG:
+                                print(f"⛔ Base cheia ({self.block_handler.counter}/15) — NÃO pegando cubo")
+                            
+                            collecting_cube = False
+                            returning = True
+                            self.navigator.go_to(saved_pose[0], saved_pose[1])
+                        else:
+                            label = self.color_classifier.capture_and_classify()
+                            self.block_handler.pick(label)
+                            
+                            self.failed_alignment_attempts = 0  # ← ADICIONAR: reset ao pegar com sucesso
+
+                            collecting_cube = False
+                            returning = True
+
+                            self.navigator.go_to(saved_pose[0], saved_pose[1])
+
+                            if self.DEBUG:
+                                print("📦 Cubo coletado — retornando ao ponto salvo")
+                continue
+
+
+            # =====================================================
+            # 🔄 RETORNO AO PONTO DA INTERRUPÇÃO
+            # =====================================================
+            if returning:
+                arrived = self.navigator.update()
+
+                if arrived:
+                    returning = False
+                    navigating = True
+
+                    self.mission_controller.current_step = saved_mission_step
+                    self.navigator.restore_state(saved_nav_state)
+                    self.mission_controller.active = True
+
+                    if self.DEBUG:
+                        print("🔄 Missão retomada do ponto exato")
+                continue
+
+            # =====================================================
+            # 🧭 EXECUÇÃO NORMAL DA MISSÃO
+            # =====================================================
+            if navigating and self.mission_controller.active:
+                self.mission_controller.update()
+
+        print("🛑 Controller finalizado")
+
+
+    # def run(self):
+    #     print("=== YouBot | Garra desce a 0.104 m | Com alinhamento lateral automático ===")
+    #     self.robot.step(self.time_step)
+    #     self.lidar_gps.init_after_first_step()
+        
+    #     while self.robot.step(self.time_step) != -1:
+    #         # inside main loop
+    #         pose = self.lidar_gps.step()
+            
+    #         if pose is not None:
+    #             self.lidar_pose = pose
+    #             if self.DEBUG:
+    #                 print(f"📍 LidarGPS pose: x={pose[0]:.3f}, y={pose[1]:.3f}")
+    #         if not self.handle_keyboard_input():
+    #             break
+    #         self.detect_objects()
+    #         # Prioriza pegar se houver cubo acessível e NÃO estiver bloqueado
+    #         if self.cube_detected_a_frente:
+    #             aligned = self.aligner.align_with_cube()
+    #             if aligned:
+    #                 reached = self.aligner.auto_approach_cube()
+    #                 if reached:
+    #                     label = self.color_classifier.capture_and_classify()
+    #                     self.block_handler.pick(label)
+    #             else:
+    #                 # ✅ ESSENCIAL: não travar o robô
+    #                 self.update_movement()
+    #         else:
+    #             self.update_movement()
+
+
+    #     self.base.move(0, 0, 0)
+    #     print("🛑 Controller finalizado")
+
+
+if __name__ == "__main__":
+    YouBotController().run()
