@@ -21,56 +21,63 @@ class FuzzySimple:
 
 
         # Funções de pertinência (distância) — ajustadas para [0, LIDAR_MAX]
-        self.dist_front['near'] = fuzz.trimf(
-    self.dist_front.universe, [0.0, 0.0, 0.22]
-)
-        self.dist_front['medium'] = fuzz.trimf(
-            self.dist_front.universe, [0.10, 0.25, 0.40]
+        self.dist_front['near'] = fuzz.gaussmf(
+    self.dist_front.universe, 0.05, 0.04
         )
-        self.dist_front['far'] = fuzz.trimf(
-            self.dist_front.universe, [0.30, self.LIDAR_MAX, self.LIDAR_MAX]
+        self.dist_front['medium'] = fuzz.gaussmf(
+            self.dist_front.universe, 0.15, 0.05
+        )
+        self.dist_front['far'] = fuzz.gaussmf(
+            self.dist_front.universe, 0.25, 0.05
         )
 
 
       
 
-        #self.v['low'] = fuzz.trimf(self.v.universe, [0.00, 0.05, 0.12])
-        #self.v['medium'] = fuzz.trimf(self.v.universe, [0.08, 0.15, 0.22])
-        #self.v['high'] = fuzz.trimf(self.v.universe, [0.18, 0.24, 0.30])
+        # Funções de pertinência (velocidade) — gaussianas para transições suaves
+        self.v['low'] = fuzz.gaussmf(
+            self.v.universe, 0.20 * self.v_max, 0.10 * self.v_max
+        )
+        self.v['medium'] = fuzz.gaussmf(
+            self.v.universe, 0.55 * self.v_max, 0.12 * self.v_max
+        )
+        self.v['high'] = fuzz.gaussmf(
+            self.v.universe, 0.90 * self.v_max, 0.10 * self.v_max
+        )
 
-        #rules = [
-       #     ctrl.Rule(self.dist_front['near'], self.v['low']),
-      #      ctrl.Rule(self.dist_front['medium'], self.v['medium']),
-     #       ctrl.Rule(self.dist_front['far'], self.v['high']),
-     #   ]
-     
-     
-     
-        # Funções de pertinência (velocidade) — baixa / média / alta
-        self.v['very_low']  = fuzz.trimf(self.v.universe, [0.00 * self.v_max, 0.10 * self.v_max, 0.20 * self.v_max])
-        self.v['low']       = fuzz.trimf(self.v.universe, [0.1667 * self.v_max, 0.2667 * self.v_max, 0.3667 * self.v_max])
-        self.v['medium']    = fuzz.trimf(self.v.universe, [0.3333 * self.v_max, 0.50 * self.v_max, 0.6667 * self.v_max])
-        self.v['high']      = fuzz.trimf(self.v.universe, [0.6333 * self.v_max, 0.7667 * self.v_max, 0.90 * self.v_max])
-        self.v['very_high'] = fuzz.trimf(self.v.universe, [0.8667 * self.v_max, 0.9667 * self.v_max, 1.00 * self.v_max])
-
-        # Compatibilidade com notebooks que esperam vx, vy
-        self.vx = self.v
-        self.vy = self.v
-
-        # Regras fuzzy (apenas por distância frontal)
         rules = [
-            # Bem perto: ativa very_low e low com duas regras
-            ctrl.Rule(self.dist_front['near'], self.v['very_low']),
-            ctrl.Rule(self.dist_front['near'], self.v['low']),
+           ctrl.Rule(self.dist_front['near'], self.v['low']),
+           ctrl.Rule(self.dist_front['medium'], self.v['medium']),
+           ctrl.Rule(self.dist_front['far'], self.v['high']),
+       ]
+     
+     
+     
+        # # Funções de pertinência (velocidade) — baixa / média / alta
+        # self.v['very_low']  = fuzz.trimf(self.v.universe, [0.00 * self.v_max, 0.10 * self.v_max, 0.20 * self.v_max])
+        # self.v['low']       = fuzz.trimf(self.v.universe, [0.1667 * self.v_max, 0.2667 * self.v_max, 0.3667 * self.v_max])
+        # self.v['medium']    = fuzz.trimf(self.v.universe, [0.3333 * self.v_max, 0.50 * self.v_max, 0.6667 * self.v_max])
+        # self.v['high']      = fuzz.trimf(self.v.universe, [0.6333 * self.v_max, 0.7667 * self.v_max, 0.90 * self.v_max])
+        # self.v['very_high'] = fuzz.trimf(self.v.universe, [0.8667 * self.v_max, 0.9667 * self.v_max, 1.00 * self.v_max])
 
-            # Médio: ativa low e medium
-            ctrl.Rule(self.dist_front['medium'], self.v['low']),
-            ctrl.Rule(self.dist_front['medium'], self.v['medium']),
+        # # Compatibilidade com notebooks que esperam vx, vy
+        # self.vx = self.v
+        # self.vy = self.v
 
-            # Longe: ativa high e very_high
-            ctrl.Rule(self.dist_front['far'], self.v['high']),
-            ctrl.Rule(self.dist_front['far'], self.v['very_high']),
-        ]
+        # # Regras fuzzy (apenas por distância frontal)
+        # rules = [
+        #     # Bem perto: ativa very_low e low com duas regras
+        #     ctrl.Rule(self.dist_front['near'], self.v['very_low']),
+        #     ctrl.Rule(self.dist_front['near'], self.v['low']),
+
+        #     # Médio: ativa low e medium
+        #     ctrl.Rule(self.dist_front['medium'], self.v['low']),
+        #     ctrl.Rule(self.dist_front['medium'], self.v['medium']),
+
+        #     # Longe: ativa high e very_high
+        #     ctrl.Rule(self.dist_front['far'], self.v['high']),
+        #     ctrl.Rule(self.dist_front['far'], self.v['very_high']),
+        # ]
 
 
         self.fuzzy_ctrl = ctrl.ControlSystem(rules)
@@ -90,13 +97,22 @@ class FuzzySimple:
         d = max(0.0, min(self.LIDAR_MAX, d))
 
         self._reset_sim()
-        self.fuzzy_sim.input['dist_front'] = d
-        self.fuzzy_sim.compute()
-        v = float(self.fuzzy_sim.output['v'])
+        
+        try:
+            self.fuzzy_sim.input['dist_front'] = d
+            self.fuzzy_sim.compute()
+            v = float(self.fuzzy_sim.output['v'])
+        except (KeyError, ValueError) as e:
+            # Fallback se defuzzificação falhar (ex: entrada fora do range de cobertura)
+            if d <= 0.08:
+                v = 0.20 * self.v_max  # velocidade baixa
+            elif d >= 0.22:
+                v = 0.90 * self.v_max  # velocidade alta
+            else:
+                # Interpola linearmente entre low e high
+                ratio = (d - 0.08) / (0.22 - 0.08)
+                v = (0.20 + ratio * 0.70) * self.v_max
+        
         return v, v
-
-    def compute(self, front_dist, lateral=None):
-        return self.compute_velocity(front_dist, lateral)
-
-
+   
 __all__ = ['FuzzySimple']

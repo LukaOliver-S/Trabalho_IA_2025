@@ -69,8 +69,8 @@ class YouBotController:
         self.sensors = SensorSuite(self.lidar_low, self.lidar_high, self.compass, step_wait=self._step_wait)
         # ================= MOVIMENTO =================
         self.movement = MovementController(self.base, step_wait=self._step_wait)
-        self.forward_speed = 0.10
-        self.strafe_speed = 0.15
+        self.forward_speed = 0.09
+        self.strafe_speed = 0.09
         self.movement_duration = 10
         self.move_forward_counter = 0
         self.move_backward_counter = 0
@@ -162,7 +162,7 @@ class YouBotController:
             elif key == ord('K'):  # Volta à posição original
                 self.rotate_to_initial()
             elif key in (ord('V'), ord('v')):
-                self.block_handler.store("red")
+                self.block_handler.push_all_cubes()
             key = self.keyboard.getKey()
         return True
 
@@ -345,8 +345,6 @@ class YouBotController:
             if self.robot.step(self.time_step) == -1:
                 break
             
-
-
 
     def run(self):
         print("=== YouBot | Missões com Coleta e Retorno ===")
@@ -540,7 +538,5 @@ class YouBotController:
 
     #     self.base.move(0, 0, 0)
     #     print("🛑 Controller finalizado")
-
-
 if __name__ == "__main__":
     YouBotController().run()

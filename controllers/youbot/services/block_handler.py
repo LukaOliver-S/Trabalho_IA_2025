@@ -115,7 +115,7 @@ class BlockHandler:
 
             # Ajustar altura para soltar na caixa
             self.robo.arm.set_height(self.robo.arm.FRONT_CARDBOARD_BOX)
-            self.robo.wait(700)
+            self.robo.wait(900)
 
             # Soltar bloco
             self.robo.gripper.release()
@@ -148,7 +148,7 @@ class BlockHandler:
         self.robo.wait(1000)
 
         # === VARREDURA RÁPIDA PARA RIGHT ===
-        arm.set_pose("1", mode="sweep", velocity=1.5)
+        arm.set_pose("1", mode="sweep", velocity=1.57)
         self.robo.wait(700)
 
         # Voltar para posição segura
@@ -157,7 +157,6 @@ class BlockHandler:
 
         # Resetar contadores
         self.counter = 0
-        self.stored = 0
         for color in self.blocks_by_color:
             self.blocks_by_color[color].clear()
 
