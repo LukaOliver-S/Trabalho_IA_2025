@@ -99,7 +99,9 @@ class YouBotController:
         self.rotation_direction = 0      
         self.target_angle = None
         self.Cube_min_dist = 0.25
-        #================= Align Controller ==========
+        self. failed_alignment_attempts = 0
+        self.max_alignment_attempts = 2
+        # ================= Align Controller ==========
         self.max_align_ticks = 300
         self.aligner = AlignmentController(
             self.base, self.sensors,
@@ -372,7 +374,7 @@ class YouBotController:
             pose = self.lidar_gps.step()
             if pose is not None:
                 self.lidar_pose = pose
-                if not self.DEBUG:
+                if  self.DEBUG:
                     print(f"📍 Pose: x={pose[0]:.2f}, y={pose[1]:.2f}")
 
             # ===== TECLADO =====
@@ -397,6 +399,13 @@ class YouBotController:
             # =====================================================
             if navigating and self.cube_detected_a_frente and not is_rotating:
                 
+                # ===== VERIFICA CAPACIDADE ANTES DE INTERROMPER =====
+                if self.block_handler.counter >= 15:  # max_capacity
+                    if self.DEBUG:
+                        print(f"Base cheia ({self.block_handler.counter}/15) — ignorando cubo detectado")
+                    # Não pausa a missão, continua navegando
+                    continue
+                
                 navigating = False
                 collecting_cube = True
 
@@ -404,7 +413,7 @@ class YouBotController:
                 saved_pose = self.lidar_pose
                 if saved_pose is None:
                     if self.DEBUG:
-                        print("⚠️ Pose ainda indisponível — aguardando...")
+                        print("Pose ainda indisponível — aguardando...")
                     for _ in range(50):
                         if self.robot.step(self.time_step) == -1:
                             break
@@ -432,6 +441,28 @@ class YouBotController:
             if collecting_cube:
                 # ===== VERIFICA TIMEOUT DE ALINHAMENTO =====
                 if self.aligner.alignment_failed:
+                    self.failed_alignment_attempts += 1  # ← ADICIONAR: incrementa tentativas
+                    
+                    # ← ADICIONAR: verifica se excedeu limite
+                    if self.failed_alignment_attempts >= self.max_alignment_attempts:
+                        if self.DEBUG:
+                            print(f"⛔ Desistindo do cubo após {self.failed_alignment_attempts} tentativas falhadas")
+                        
+                        collecting_cube = False
+                        navigating = True
+                        self.failed_alignment_attempts = 0  # ← reset contador
+                        
+                        # Restaura missão
+                        self.mission_controller.current_step = saved_mission_step
+                        if saved_nav_state:
+                            self.navigator.restore_state(saved_nav_state)
+                        self.mission_controller.active = True
+                        
+                        self.aligner.align_ticks = 0
+                        self.aligner.alignment_failed = False
+                        continue
+                    
+                    # ← ADICIONAR: se não excedeu, tenta novamente
                     collecting_cube = False
                     navigating = True
 
@@ -446,7 +477,7 @@ class YouBotController:
                     self.aligner.alignment_failed = False
 
                     if self.DEBUG:
-                        print("⛔ Falha no alinhamento (timeout) — desistindo e retomando missão")
+                        print(f"⛔ Falha no alinhamento (tentativa {self.failed_alignment_attempts}/{self.max_alignment_attempts}) — retentando")
                     continue
 
                 # ===== TENTATIVA DE ALINHAMENTO =====
@@ -467,6 +498,8 @@ class YouBotController:
                         else:
                             label = self.color_classifier.capture_and_classify()
                             self.block_handler.pick(label)
+                            
+                            self.failed_alignment_attempts = 0  # ← ADICIONAR: reset ao pegar com sucesso
 
                             collecting_cube = False
                             returning = True
@@ -476,6 +509,7 @@ class YouBotController:
                             if self.DEBUG:
                                 print("📦 Cubo coletado — retornando ao ponto salvo")
                 continue
+
 
 
             # =====================================================
@@ -538,5 +572,6 @@ class YouBotController:
 
     #     self.base.move(0, 0, 0)
     #     print("🛑 Controller finalizado")
+    
 if __name__ == "__main__":
     YouBotController().run()

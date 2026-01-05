@@ -23,119 +23,7 @@ else:
     x_min, x_max = -3, 1.75
     y_min, y_max = -1, 1
 
-# ===================================================================
-# 🔵 ADIÇÃO: Desenhar retângulo delimitando a área de spawn
-# ===================================================================
-
-area_width = abs(x_max - x_min)
-area_height = abs(y_max - y_min)
-
-center_x = (x_min + x_max) / 2
-center_y = (y_min + y_max) / 2
-
-area_marker = f"""
-Solid {{
-  translation {center_x} {center_y} 0.002
-  rotation 0 0 1 0
-  name "spawn_area_marker"
-  children [
-    Shape {{
-      appearance PBRAppearance {{
-        baseColor 0 0 1
-        transparency 0.6
-      }}
-      geometry Box {{
-        size {area_width} {area_height} 0.001
-      }}
-    }}
-  ]
-}}
-"""
-
-# removendo marcador anterior (se existir)
-for i in reversed(range(root_children.getCount())):
-    node = root_children.getMFNode(i)
-    name_field = node.getField("name")
-    if name_field and name_field.getSFString() == "spawn_area_marker":
-        node.remove()
-
-# inserindo o novo marcador
-root_children.importMFNodeFromString(-1, area_marker)
-
-def draw_obstacle_safety_zones(obstacles):
-    """Draw red safety zones on the ground around each obstacle."""
-    
-    # remove zonas antigas
-    for i in reversed(range(root_children.getCount())):
-        node = root_children.getMFNode(i)
-        name_field = node.getField("name")
-        if name_field and name_field.getSFString().startswith("safety_zone_"):
-            node.remove()
-
-    # cria novas zonas
-    for idx, obs in enumerate(obstacles):
-        radius = obs['radius'] + size
-
-        zone_string = f"""
-        Solid {{
-          translation {obs['x']} {obs['y']} 0.001
-          name "safety_zone_{idx}"
-          children [
-            Shape {{
-              appearance PBRAppearance {{
-                baseColor 1 0 0
-                transparency 0.6
-              }}
-              geometry Cylinder {{
-                radius {radius}
-                height 0.001
-              }}
-            }}
-          ]
-        }}
-        """
-
-        root_children.importMFNodeFromString(-1, zone_string)
- 
-def draw_cube_safety_zones(cube_positions):
-    """Draw red safety zones on the ground around each small cube."""
-
-    # remove zonas antigas
-    for i in reversed(range(root_children.getCount())):
-        node = root_children.getMFNode(i)
-        name_field = node.getField("name")
-        if name_field and name_field.getSFString().startswith("cube_safety_"):
-            node.remove()
-
-    radius = min_dist / 2
-
-    for idx, pos in enumerate(cube_positions):
-        zone_string = f"""
-        Solid {{
-          translation {pos[0]} {pos[1]} 0.001
-          name "cube_safety_{idx}"
-          children [
-            Shape {{
-              appearance PBRAppearance {{
-                baseColor 1 0 0
-                transparency 0.4
-              }}
-              geometry Cylinder {{
-                radius {radius}
-                height 0.001
-              }}
-            }}
-          ]
-        }}
-        """
-
-        root_children.importMFNodeFromString(-1, zone_string)
-    
-
-
-# ===================================================================
-# (Restante do seu código original — nada removido)
-# ===================================================================
+#print(f"Spawner: {n_objects} objects in X[{x_min},{x_max}] Y[{y_min},{y_max}]")
 
 def get_existing_obstacles():
     """Extract positions of WoodenBoxes and PlasticFruitBoxes from the world."""
@@ -162,6 +50,7 @@ def get_existing_obstacles():
                     'y': pos[1],
                     'radius': radius + 0.1
                 })
+                #print(f"Found obstacle at ({pos[0]:.2f}, {pos[1]:.2f}) with radius {radius:.2f}")
     
     return obstacles
 
@@ -183,8 +72,6 @@ mass = 0.03
 min_dist = size * 2.5
 
 existing_obstacles = get_existing_obstacles()
-draw_obstacle_safety_zones(existing_obstacles)
-
 
 positions = []
 colors = [
@@ -244,6 +131,7 @@ for i in range(n_objects):
         geometry = f"Box {{ size {size} {size} {size} }}"
         bounding = f"Box {{ size {size} {size} {size} }}"
     
+    # Node string
     node_string = f"""
     Solid {{
       translation {pos[0]} {pos[1]} {pos[2]}
@@ -266,13 +154,16 @@ for i in range(n_objects):
       recognitionColors [ {color[0]} {color[1]} {color[2]} ]
     }}
     """
-
     root_children.importMFNodeFromString(-1, node_string)
     spawned_count += 1
-    
-draw_cube_safety_zones(positions)
 
 print(f"Spawn complete. The supervisor has spawned {spawned_count}/{n_objects} objects ({failed_spawns} failed).")
+#print("Initializing physics...")
 
 for _ in range(20):
     supervisor.step(timestep)
+
+#print("Supervisor ready.")
+
+#while supervisor.step(timestep) != -1:
+    #pass
