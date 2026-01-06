@@ -103,7 +103,7 @@ class YouBotController:
         self.failed_alignment_attempts = 0  
         self.max_alignment_attempts = 2     
         #================= Align Controller ==========
-        self.max_align_ticks = 6500
+        self.max_align_ticks = 12000
         self.aligner = AlignmentController(
             self.base, self.sensors,
             kp=0.1, max_vy=0.09, deadzone=self.ALIGN_DEADZONE,
