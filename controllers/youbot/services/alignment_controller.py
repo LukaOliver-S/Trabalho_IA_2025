@@ -35,7 +35,7 @@ class AlignmentController:
 
         # ===== LOGGING DE DADOS =====
         self.log_data = []
-        self.log_enabled = True
+        self.log_enabled = False
         self.log_dir = Path("fuzzy_alignment_data")
         self.log_dir.mkdir(exist_ok=True)
         self.current_session_id = None
@@ -255,8 +255,8 @@ class AlignmentController:
         
         speed_factor = self._get_fuzzy_speed_factor(dist)
         
-        v_cap = self.forward_speed * speed_factor
-        vx = max(-v_cap, min(v_cap, vx_p))
+        vx = vx_p * speed_factor
+        vx = max(-self.forward_speed, min(self.forward_speed, vx))
 
         if abs(vx) < self.MIN_APPROACH_SPEED:
             vx = math.copysign(self.MIN_APPROACH_SPEED, vx)

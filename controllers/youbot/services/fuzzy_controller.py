@@ -50,34 +50,6 @@ class FuzzySimple:
            ctrl.Rule(self.dist_front['medium'], self.v['medium']),
            ctrl.Rule(self.dist_front['far'], self.v['high']),
        ]
-     
-     
-     
-        # # Funções de pertinência (velocidade) — baixa / média / alta
-        # self.v['very_low']  = fuzz.trimf(self.v.universe, [0.00 * self.v_max, 0.10 * self.v_max, 0.20 * self.v_max])
-        # self.v['low']       = fuzz.trimf(self.v.universe, [0.1667 * self.v_max, 0.2667 * self.v_max, 0.3667 * self.v_max])
-        # self.v['medium']    = fuzz.trimf(self.v.universe, [0.3333 * self.v_max, 0.50 * self.v_max, 0.6667 * self.v_max])
-        # self.v['high']      = fuzz.trimf(self.v.universe, [0.6333 * self.v_max, 0.7667 * self.v_max, 0.90 * self.v_max])
-        # self.v['very_high'] = fuzz.trimf(self.v.universe, [0.8667 * self.v_max, 0.9667 * self.v_max, 1.00 * self.v_max])
-
-        # # Compatibilidade com notebooks que esperam vx, vy
-        # self.vx = self.v
-        # self.vy = self.v
-
-        # # Regras fuzzy (apenas por distância frontal)
-        # rules = [
-        #     # Bem perto: ativa very_low e low com duas regras
-        #     ctrl.Rule(self.dist_front['near'], self.v['very_low']),
-        #     ctrl.Rule(self.dist_front['near'], self.v['low']),
-
-        #     # Médio: ativa low e medium
-        #     ctrl.Rule(self.dist_front['medium'], self.v['low']),
-        #     ctrl.Rule(self.dist_front['medium'], self.v['medium']),
-
-        #     # Longe: ativa high e very_high
-        #     ctrl.Rule(self.dist_front['far'], self.v['high']),
-        #     ctrl.Rule(self.dist_front['far'], self.v['very_high']),
-        # ]
 
 
         self.fuzzy_ctrl = ctrl.ControlSystem(rules)

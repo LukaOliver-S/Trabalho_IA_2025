@@ -158,7 +158,6 @@ class MissionController:
         # =================================================
         if step_type == "path":
             # correção de heading durante path
-            print(value)
             if self._fixed_heading is not None and not self._rotation_interruption:
                 cur = self.robot.get_current_angle()
                 diff = self.robot.angle_diff(self._fixed_heading, cur)

@@ -46,7 +46,7 @@ class BlockHandler:
         self.robo.gripper.grip()
         self.robo.wait(400)
         # current gap approx:0.07100000000000001
-        print(self.robo.gripper.check_cube_grasped())
+        self.robo.gripper.check_cube_grasped()
         if self.robo.gripper.has_object():
             print("Bloco agarrado!")
             self.counter+=1
@@ -104,7 +104,7 @@ class BlockHandler:
             # Agarrar bloco
             self.robo.gripper.grip()
             self.robo.wait(400)
-            print(self.robo.gripper.check_cube_grasped())
+            self.robo.gripper.check_cube_grasped()
             if self.robo.gripper.has_object():
                 print("Bloco stored")
                 self.stored+=1

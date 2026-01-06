@@ -1,33 +1,35 @@
+import sys
+
 import math
-from controller import Robot, Keyboard
+from controller import Robot
 from base import Base
 from arm import Arm
 from gripper import Gripper
 import numpy as np
 from pathlib import Path
 
-import sys
 from services import (
     BlockHandler,
     SensorSuite,
-    MovementController,
     NavigationController,
     MissionController,
-    AngleController,
-    ObstacleAvoider,
     AlignmentController,
-    ObjectDetector,
     LidarGpsController,
     ColorClassifier,
-    FuzzySimple
+    FuzzySimple,
+    ObjectDetector
 )
+
+import warnings
+warnings.filterwarnings("ignore")
 
 class YouBotController:
     def __init__(self):
         self.robot = Robot()
         self.time_step = int(self.robot.getBasicTimeStep())
         self.dt = self.time_step / 1000.0
-        self.DEBUG = True
+        self.DEBUG = False
+        
         # ================= COMPONENTES =================
         self.base = Base(self.robot)
         self.arm = Arm(self.robot)
@@ -50,7 +52,9 @@ class YouBotController:
         self.lidar_low.enable(self.time_step)
         self.lidar_high.enable(self.time_step)
         self.lidar_global.enable(self.time_step)   
-        self.lidar_global.enablePointCloud()  # ← ativa visualização        # ================= LIDAR_GPS ===============
+        self.lidar_global.enablePointCloud()
+        
+        # ================= LIDAR_GPS ===============
 
         self.lidar_gps = LidarGpsController(
             self.lidar_global,
@@ -62,13 +66,15 @@ class YouBotController:
         )
 
         self.lidar_pose = None
+        
         # ================= COMPASS =================
         self.compass = self.robot.getDevice("compass")
         self.compass.enable(self.time_step)
+        
         # ==================SENSORS====================
         self.sensors = SensorSuite(self.lidar_low, self.lidar_high, self.compass, step_wait=self._step_wait)
+        
         # ================= MOVIMENTO =================
-        self.movement = MovementController(self.base, step_wait=self._step_wait)
         self.forward_speed = 0.09
         self.strafe_speed = 0.09
         self.movement_duration = 10
@@ -76,20 +82,20 @@ class YouBotController:
         self.move_backward_counter = 0
         self.strafe_left_counter = 0
         self.strafe_right_counter = 0
-        # ================= angulação =================
-        self.angle_controller = AngleController(self.compass, self.base, self.dt) # Por algum motivo não funciona
-        
-        
+                
         # fuzzy velocity selector 
         self.fuzzy = FuzzySimple(v_max=0.10)
+        
         # ================= PARÂMETROS =================
         self.CUBE_HEIGHT = 0.03
         self.DISTANCE_DIFF_THRESH = 0.01
+        
         # ================= PICK =================
         self.PICK_DISTANCE = 0.169
         self.PICK_TOL = 0.001
         self.MIN_APPROACH_SPEED = 0.03  # velocidade mínima para aproximação
         self.ALIGN_DEADZONE = 0.005     # tolerância lateral para considerar "centralizado"
+        
         #================== GRIPPER CONTROLLER ========
         self.gripper_descended = False
         self.is_picking = False   
@@ -101,8 +107,9 @@ class YouBotController:
         self.Cube_min_dist = 0.25
         self. failed_alignment_attempts = 0
         self.max_alignment_attempts = 2
+        
         # ================= Align Controller ==========
-        self.max_align_ticks = 300
+        self.max_align_ticks = 6000
         self.aligner = AlignmentController(
             self.base, self.sensors,
             kp=0.3, max_vy=0.1, deadzone=self.ALIGN_DEADZONE,
@@ -115,21 +122,6 @@ class YouBotController:
             max_align_ticks= self.max_align_ticks, 
             max_capacity=15,
         )
-   
-    # ================= AVOID ====================
-        self.OBSTACLE_MIN_DIST = 0.30   # espaço mínimo atrás do cubo para considerar "acessível"
-        self.obstacle_detected = False
-        self.obstacle_blocking_cube = False
-        self.avoiding = False
-        self.avoider = ObstacleAvoider(self.base, self.lidar_low, self.lidar_high, self.sensors, step_wait=self._step_wait, dt=self.dt, debug=self.DEBUG,    obstacle_min_dist=self.OBSTACLE_MIN_DIST,  # <= pass min-dist
-)
-
-     # ================== OBJECT DETECTOR==========
-        self.detector = ObjectDetector(self.sensors,
-                               distance_diff_thresh=self.DISTANCE_DIFF_THRESH,
-                               obstacle_min_dist=self.OBSTACLE_MIN_DIST,
-                               step_wait=self._step_wait,
-                               debug=self.DEBUG)
     
         # ================= BLOCK HANDLER & COLOR CLASSIFIER ==========
         self.block_handler = BlockHandler(self)
@@ -140,48 +132,22 @@ class YouBotController:
             self,
         )
         self.mission_controller = MissionController(self.navigator, self)
-        
-    # ================= KEYBOARD =================
-    def handle_keyboard_input(self):
-        key = self.keyboard.getKey()
-        while key >= 0:
-            if key in (ord('W'), ord('w')):
-                self.movement.forward()
-            elif key in (ord('S'), ord('s')):
-                self.movement.backward()
-            elif key in (ord('A'), ord('a')):
-                self.movement.strafe_left()
-            elif key in (ord('D'), ord('d')):
-                self.movement.strafe_right()
-            elif key == ord(' '):
-                self.movement.stop_all()
-            elif key in (ord('Q'), ord('q')):
-                return False
-            elif key == ord('J'):  # Gira 90° à esquerda
-                self.rotate_right_90()
-            elif key == ord('L'):  # Gira 90° à direita
-                self.rotate_left_90()
-            elif key == ord('K'):  # Volta à posição original
-                self.rotate_to_initial()
-            elif key in (ord('V'), ord('v')):
-                self.block_handler.push_all_cubes()
-            key = self.keyboard.getKey()
-        return True
 
-    def wait(self, steps=30):
-        for _ in range(steps):
-            self.robot.step(self.time_step)
-            
-    # ================= MOVIMENTO =================
-    def update_movement(self):
-        # proxy picking/block state into movement controller and delegate
-        self.movement.is_picking = getattr(self, "picker", None) and self.picker.is_picking
-        self.movement.block_forward = getattr(self, "block_forward", False)
-        self.movement.update()
+     # ================== OBJECT DETECTOR==========
+        self.OBSTACLE_MIN_DIST = 0.30
+        self.obstacle_detected = False
+        self.obstacle_blocking_cube = False
+        
+        self.detector = ObjectDetector(self.sensors,
+                                distance_diff_thresh=self.DISTANCE_DIFF_THRESH,
+                                obstacle_min_dist=self.OBSTACLE_MIN_DIST,
+                                step_wait=self._step_wait,
+                                debug=self.DEBUG)
 
     # ================= LIDAR READ =================
     def read_lidars(self):
         return self.sensors.read_lidars()
+    
     # ================= COMPASS / ROTAÇÃO =================
     def get_current_angle(self):
         north = self.compass.getValues()
@@ -196,37 +162,11 @@ class YouBotController:
         d = (target - current + 180) % 360 - 180
         return d
 
-    def start_rotation(self, target_angle):
-        """Inicia a rotação não-bloqueante."""
-        self.target_angle = target_angle % 360
-        self.rotating = True
-
-
-    def rotate_to_initial(self):
-        """Gira até o ângulo inicial definido."""
-        if self.rotating:
-            return
-        self.rotate_to_angle(self.initial_angle)
-
     def rotate_to_angle(self, target_angle):
         """Inicia a rotação em direção a target_angle (não-bloqueante)."""
         self.target_angle = target_angle % 360
         self.rotating = True
         self.rotation_started = False  # reinicia a inicialização da direção
-
-    def rotate_left_90(self):
-        """Gira 90° para a esquerda a partir do ângulo atual."""
-        if self.rotating:
-            return
-        current = self.get_current_angle()
-        self.rotate_to_angle((current - 90) % 360)
-
-    def rotate_right_90(self):
-        """Gira 90° para a direita a partir do ângulo atual."""
-        if self.rotating:
-            return
-        current = self.get_current_angle()
-        self.rotate_to_angle((current + 90) % 360)
 
     def update_rotation(self):
         if not self.rotating:
@@ -279,7 +219,7 @@ class YouBotController:
         sin_yaw = x / norm
         return (cos_yaw, sin_yaw)
 
-    # ================= DETECT (INTACTA) =================
+    # ================= DETECT =================
     def detect_objects(self):
         # Reset flags (mantém comportamento anterior)
         if not self.is_picking:
@@ -300,54 +240,20 @@ class YouBotController:
         self.cube_detected_a_frente = bool(res["cube_detected_a_frente"])
         self.obstacle_detected = bool(res["obstacle_detected"])
         self.obstacle_blocking_cube = bool(res["obstacle_blocking_cube"])
-
-    # ================= AVOID OBJECT ================================
-    def avoid_obstacle(self):
-            self.move_forward_counter = 0
-            self.move_backward_counter = 0
-            self.block_forward = True
-            self.base.move(0, 0, 0)
-            self._step_wait(0.03)
-            freed = self.avoider.start_avoid()
-            if freed:
-                self.obstacle_detected = False
-            # copia estados úteis do avoider para o controlador (opcional)
-            self.avoid_cooldown = self.avoider.avoid_cooldown
-            self.avoid_attempts = self.avoider.avoid_attempts
-            self.last_avoid_side = self.avoider.last_avoid_side
-            self.recently_freed = self.avoider.recently_freed
-            self.block_forward = False
             
-    # ================= DESCEND GRIPPER (REESCRITA) =================
-    def descend_gripper_if_target_distance(self):
-        if self.is_picking or not self.cube_detected_a_frente:
-            self.gripper_descended = False
-            return
-
-        min_low, _ = self.read_lidars()
-        if not np.isfinite(min_low):
-            self.gripper_descended = False
-            return
-
-        if abs(min_low - self.PICK_DISTANCE) <= self.PICK_TOL:
-            self.is_picking = True
-            try:
-                self.picker.do_pick_blocking()
-                self.gripper_descended = True
-            finally:
-                self.is_picking = False
-        else:
-            self.gripper_descended = False
-            
-   
     # ================= UTILS =================
     def _step_wait(self, seconds):
         steps = max(1, int(seconds / self.dt))
         for _ in range(steps):
             if self.robot.step(self.time_step) == -1:
                 break
+
+    def wait(self, steps=30):
+        for _ in range(steps):
+            self.robot.step(self.time_step)
             
 
+    # ================= RUN =================
     def run(self):
         print("=== YouBot | Missões com Coleta e Retorno ===")
 
@@ -376,10 +282,6 @@ class YouBotController:
                 self.lidar_pose = pose
                 if  self.DEBUG:
                     print(f"📍 Pose: x={pose[0]:.2f}, y={pose[1]:.2f}")
-
-            # ===== TECLADO =====
-            if not self.handle_keyboard_input():
-                break
 
             # =====================================================
             # 🔄 CONTROLE DE ROTAÇÃO
@@ -511,7 +413,6 @@ class YouBotController:
                 continue
 
 
-
             # =====================================================
             # 🔄 RETORNO AO PONTO DA INTERRUPÇÃO
             # =====================================================
@@ -538,40 +439,6 @@ class YouBotController:
 
         print("🛑 Controller finalizado")
 
-
-    # def run(self):
-    #     print("=== YouBot | Garra desce a 0.104 m | Com alinhamento lateral automático ===")
-    #     self.robot.step(self.time_step)
-    #     self.lidar_gps.init_after_first_step()
-        
-    #     while self.robot.step(self.time_step) != -1:
-    #         # inside main loop
-    #         pose = self.lidar_gps.step()
-            
-    #         if pose is not None:
-    #             self.lidar_pose = pose
-    #             if self.DEBUG:
-    #                 print(f"📍 LidarGPS pose: x={pose[0]:.3f}, y={pose[1]:.3f}")
-    #         if not self.handle_keyboard_input():
-    #             break
-    #         self.detect_objects()
-    #         # Prioriza pegar se houver cubo acessível e NÃO estiver bloqueado
-    #         if self.cube_detected_a_frente:
-    #             aligned = self.aligner.align_with_cube()
-    #             if aligned:
-    #                 reached = self.aligner.auto_approach_cube()
-    #                 if reached:
-    #                     label = self.color_classifier.capture_and_classify()
-    #                     self.block_handler.pick(label)
-    #             else:
-    #                 # ✅ ESSENCIAL: não travar o robô
-    #                 self.update_movement()
-    #         else:
-    #             self.update_movement()
-
-
-    #     self.base.move(0, 0, 0)
-    #     print("🛑 Controller finalizado")
     
 if __name__ == "__main__":
     YouBotController().run()

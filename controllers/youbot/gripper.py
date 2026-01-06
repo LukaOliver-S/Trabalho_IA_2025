@@ -18,7 +18,7 @@ Description: Python wrapper for YouBot gripper control
 
 
 MIN_POS = 0.0      
-MAX_POS = 0.025   
+MAX_POS = 0.025
 
 GAP_MIN = 0.0     
 GAP_MAX = 0.05     
@@ -115,8 +115,6 @@ class Gripper:
           - se gap final >= CUBE_SIZE - tol => dedos travaram no cubo => pegou
         """
         gap = self.current_gap()
-        print(CUBE_SIZE)
-        print(gap)
         if gap < CUBE_SIZE:
             # conseguiu fechar demais: não travou no cubo
             self.has_cube = False
